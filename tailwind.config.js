@@ -26,7 +26,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "sans-serif"],
-        heading: ["var(--font-outfit)", "Outfit", "sans-serif"],
+        heading: ["var(--font-inter)", "Inter", "sans-serif"],
       },
     },
   },

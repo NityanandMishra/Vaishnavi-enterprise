@@ -151,6 +151,9 @@ model Category {
   parent   Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children Category[]  @relation("CategoryHierarchy")
   products Product[]
+
+  // No two categories may share the same name within the same parent scope
+  @@unique([name, parentId])
 }
 
 // ─── PRODUCT ─────────────────────────────────────────────────────────────────

@@ -12,8 +12,6 @@ import {
   ShoppingBag,
   MessageSquare,
   LogOut,
-  Zap,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,21 +29,15 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-slate-950 border-r border-white/5 flex-shrink-0">
-
+    <aside className="w-[260px] h-screen bg-[#0F172A] flex flex-col py-6 sticky top-0 z-50 overflow-y-auto flex-shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-white/5">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-brand-orange-500 to-brand-orange-700">
-          <Zap size={20} fill="white" color="white" />
-        </div>
-        <div>
-          <p className="font-heading font-bold text-sm text-white leading-tight">Vaishnavi</p>
-          <p className="text-[10px] text-slate-500 leading-tight tracking-widest uppercase">Admin Portal</p>
-        </div>
+      <div className="px-6 mb-9">
+        <h1 className="m-0 font-sans font-extrabold text-2xl text-white leading-none tracking-tight">Vaishnavi</h1>
+        <p className="mt-[2px] font-sans font-bold text-[11px] leading-tight tracking-[0.12em] text-[#EA580C] uppercase">Enterprises</p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 flex flex-col gap-[2px]">
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const isActive = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -53,27 +45,26 @@ export default function AdminSidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
+                "flex items-center gap-3 px-6 py-[12px] cursor-pointer text-white transition-all font-sans text-sm font-medium",
                 isActive
-                  ? "bg-brand-orange-600/20 text-brand-orange-400 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  ? "border-l-[4px] border-[#EA580C] bg-[#1E293B] opacity-100"
+                  : "border-l-[4px] border-transparent opacity-75 hover:opacity-100 hover:bg-[#1E293B]/50"
               )}
             >
-              <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
-              <span className="flex-1">{label}</span>
-              {isActive && <ChevronRight size={14} className="opacity-60" />}
+              <Icon size={18} className="opacity-90" />
+              <span>{label}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-4 border-t border-white/5">
+      <div className="px-6 pt-5 mt-4 border-t border-white/10">
         <button
           onClick={() => signOut({ callbackUrl: "/admin/login" })}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-950/20 transition-all"
+          className="flex items-center gap-3 w-full text-left text-white opacity-75 hover:opacity-100 hover:text-red-400 transition-all font-sans text-sm font-medium"
         >
-          <LogOut size={18} strokeWidth={1.8} />
+          <LogOut size={18} />
           <span>Logout</span>
         </button>
       </div>
