@@ -48,6 +48,16 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
     setSearchQuery("");
   }, [pathname]);
 
+  /**
+   * Closed on tap rather than on the pathname change alone. A navigation only
+   * commits once the destination has rendered, so waiting on it left the menu
+   * sitting open with nothing happening — long enough to read as a dead link.
+   */
+  const closeMenus = () => {
+    setMobileMenuOpen(false);
+    setMegaOpen(false);
+  };
+
   useEffect(() => {
     if (!megaOpen) return;
 
@@ -201,6 +211,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
                 <div key={cat.id} className="min-w-0">
                   <Link
                     href={`/categories/${cat.slug}`}
+                    onClick={closeMenus}
                     className="block text-sm font-bold text-slate-900 hover:text-brand-orange-600 transition-colors mb-2 truncate"
                   >
                     {cat.name}
@@ -221,6 +232,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
                           <li key={sub.id}>
                             <Link
                               href={`/categories/${sub.slug}`}
+                              onClick={closeMenus}
                               className="block text-sm text-slate-600 hover:text-brand-orange-600 transition-colors truncate"
                             >
                               {sub.name}
@@ -239,6 +251,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
             <div className="mt-6 pt-4 border-t border-border-base">
               <Link
                 href="/categories"
+                onClick={closeMenus}
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 hover:text-brand-orange-600 transition-colors"
               >
                 View all categories
@@ -278,6 +291,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
               <div key={cat.id} className="border-b border-border-base last:border-0 py-1">
                 <Link
                   href={`/categories/${cat.slug}`}
+                  onClick={closeMenus}
                   className="block py-3 px-3 -mx-1 text-sm font-semibold text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
                 >
                   {cat.name}
@@ -297,6 +311,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
                         <li key={sub.id}>
                           <Link
                             href={`/categories/${sub.slug}`}
+                            onClick={closeMenus}
                             className="block py-2.5 pl-6 pr-3 -mx-1 text-sm text-slate-600 hover:bg-surface-alt rounded-md transition-colors"
                           >
                             {sub.name}
@@ -317,6 +332,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
               <Link
                 key={href}
                 href={href}
+                onClick={closeMenus}
                 className="py-3 px-3 -mx-1 mt-1 text-sm font-medium text-slate-700 hover:bg-surface-alt rounded-md transition-colors"
               >
                 {label}
