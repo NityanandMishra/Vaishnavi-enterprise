@@ -28,3 +28,6 @@ yarn-error.log*
 # SQLite dev database
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# Claude Code local settings
+.claude/settings.local.json

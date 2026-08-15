@@ -1,0 +1,407 @@
+{
+  "$schema": "https://design-tokens.org/schema.json",
+  "$description": "Vaishnavi Enterprises identity tokens. Primitive -> semantic -> component. Source of truth for the brand palette: tailwind.config.js reads the primitive layer from this file, and src/styles/design-tokens.css is generated from it.",
+  "primitive": {
+    "color": {
+      "brand": {
+        "orange": {
+          "50": {
+            "$value": "#fff7ed",
+            "$type": "color"
+          },
+          "100": {
+            "$value": "#ffedd5",
+            "$type": "color"
+          },
+          "200": {
+            "$value": "#fed7aa",
+            "$type": "color"
+          },
+          "300": {
+            "$value": "#fdba74",
+            "$type": "color"
+          },
+          "400": {
+            "$value": "#fb923c",
+            "$type": "color"
+          },
+          "500": {
+            "$value": "#f97316",
+            "$type": "color"
+          },
+          "600": {
+            "$value": "#ea580c",
+            "$type": "color"
+          },
+          "700": {
+            "$value": "#c2410c",
+            "$type": "color"
+          },
+          "800": {
+            "$value": "#9a3412",
+            "$type": "color"
+          },
+          "900": {
+            "$value": "#7c2d12",
+            "$type": "color"
+          },
+          "950": {
+            "$value": "#431407",
+            "$type": "color"
+          }
+        }
+      },
+      "slate": {
+        "50": {
+          "$value": "#F8FAFC",
+          "$type": "color"
+        },
+        "200": {
+          "$value": "#E2E8F0",
+          "$type": "color"
+        },
+        "400": {
+          "$value": "#94A3B8",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#0F172A",
+          "$type": "color"
+        },
+        "950": {
+          "$value": "#131B2E",
+          "$type": "color"
+        }
+      },
+      "white": {
+        "$value": "#FFFFFF",
+        "$type": "color"
+      }
+    },
+    "size": {
+      "xs": {
+        "$value": "16px",
+        "$type": "dimension"
+      },
+      "sm": {
+        "$value": "24px",
+        "$type": "dimension"
+      },
+      "md": {
+        "$value": "36px",
+        "$type": "dimension"
+      },
+      "lg": {
+        "$value": "64px",
+        "$type": "dimension"
+      }
+    },
+    "spacing": {
+      "1": {
+        "$value": "0.25rem",
+        "$type": "dimension"
+      },
+      "2": {
+        "$value": "0.5rem",
+        "$type": "dimension"
+      },
+      "3": {
+        "$value": "0.75rem",
+        "$type": "dimension"
+      }
+    },
+    "fontSize": {
+      "micro": {
+        "$value": "0.625rem",
+        "$type": "dimension"
+      },
+      "base": {
+        "$value": "1rem",
+        "$type": "dimension"
+      },
+      "2xl": {
+        "$value": "1.5rem",
+        "$type": "dimension"
+      }
+    },
+    "fontWeight": {
+      "semibold": {
+        "$value": "600",
+        "$type": "fontWeight"
+      },
+      "extrabold": {
+        "$value": "800",
+        "$type": "fontWeight"
+      }
+    },
+    "letterSpacing": {
+      "tight": {
+        "$value": "-0.02em",
+        "$type": "dimension"
+      },
+      "wide": {
+        "$value": "0.18em",
+        "$type": "dimension"
+      }
+    },
+    "strokeWidth": {
+      "mark": {
+        "$value": "5.5",
+        "$type": "number"
+      }
+    },
+    "radius": {
+      "md": {
+        "$value": "0.375rem",
+        "$type": "dimension"
+      }
+    },
+    "opacity": {
+      "hover": {
+        "$value": "0.85",
+        "$type": "number"
+      },
+      "active": {
+        "$value": "0.7",
+        "$type": "number"
+      }
+    },
+    "duration": {
+      "fast": {
+        "$value": "150ms",
+        "$type": "duration"
+      }
+    }
+  },
+  "semantic": {
+    "color": {
+      "brand": {
+        "$value": "var(--primitive-color-brand-orange-600)",
+        "$type": "color",
+        "$ref": "{primitive.color.brand.orange.600}"
+      },
+      "brand-strong": {
+        "$value": "var(--primitive-color-brand-orange-700)",
+        "$type": "color",
+        "$ref": "{primitive.color.brand.orange.700}"
+      },
+      "brand-soft": {
+        "$value": "var(--primitive-color-brand-orange-500)",
+        "$type": "color",
+        "$ref": "{primitive.color.brand.orange.500}"
+      },
+      "ink": {
+        "$value": "var(--primitive-color-slate-900)",
+        "$type": "color",
+        "$ref": "{primitive.color.slate.900}"
+      },
+      "ink-muted": {
+        "$value": "var(--primitive-color-slate-400)",
+        "$type": "color",
+        "$ref": "{primitive.color.slate.400}"
+      },
+      "ink-inverse": {
+        "$value": "var(--primitive-color-white)",
+        "$type": "color",
+        "$ref": "{primitive.color.white}"
+      },
+      "surface": {
+        "$value": "var(--primitive-color-white)",
+        "$type": "color",
+        "$ref": "{primitive.color.white}"
+      },
+      "surface-inverse": {
+        "$value": "var(--primitive-color-slate-950)",
+        "$type": "color",
+        "$ref": "{primitive.color.slate.950}"
+      },
+      "focus-ring": {
+        "$value": "var(--primitive-color-brand-orange-600)",
+        "$type": "color",
+        "$ref": "{primitive.color.brand.orange.600}"
+      }
+    },
+    "typography": {
+      "font-heading": {
+        "$value": "var(--font-inter), Inter, sans-serif",
+        "$type": "fontFamily"
+      }
+    }
+  },
+  "component": {
+    "logo": {
+      "gap": {
+        "$value": "var(--primitive-spacing-2)",
+        "$type": "dimension",
+        "$ref": "{primitive.spacing.2}"
+      },
+      "clearspace": {
+        "$value": "0.5em",
+        "$type": "dimension"
+      },
+      "mark": {
+        "size-xs": {
+          "$value": "var(--primitive-size-xs)",
+          "$type": "dimension",
+          "$ref": "{primitive.size.xs}"
+        },
+        "size-sm": {
+          "$value": "var(--primitive-size-sm)",
+          "$type": "dimension",
+          "$ref": "{primitive.size.sm}"
+        },
+        "size-md": {
+          "$value": "var(--primitive-size-md)",
+          "$type": "dimension",
+          "$ref": "{primitive.size.md}"
+        },
+        "size-lg": {
+          "$value": "var(--primitive-size-lg)",
+          "$type": "dimension",
+          "$ref": "{primitive.size.lg}"
+        },
+        "min-size": {
+          "$value": "var(--primitive-size-xs)",
+          "$type": "dimension",
+          "$ref": "{primitive.size.xs}"
+        },
+        "ring": {
+          "$value": "var(--color-brand)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand}"
+        },
+        "ring-width": {
+          "$value": "var(--primitive-strokeWidth-mark)",
+          "$type": "number",
+          "$ref": "{primitive.strokeWidth.mark}"
+        },
+        "bolt": {
+          "$value": "currentColor",
+          "$type": "color"
+        },
+        "arm-strong": {
+          "$value": "var(--color-brand-strong)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand-strong}"
+        },
+        "arm-soft": {
+          "$value": "var(--color-brand-soft)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand-soft}"
+        },
+        "rotor": {
+          "$value": "var(--color-brand)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand}"
+        },
+        "tile-bg": {
+          "$value": "var(--color-brand)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand}"
+        },
+        "tile-fg": {
+          "$value": "var(--color-ink-inverse)",
+          "$type": "color",
+          "$ref": "{semantic.color.ink-inverse}"
+        }
+      },
+      "name": {
+        "family": {
+          "$value": "var(--typography-font-heading)",
+          "$type": "fontFamily",
+          "$ref": "{semantic.typography.font-heading}"
+        },
+        "size": {
+          "$value": "var(--primitive-fontSize-base)",
+          "$type": "dimension",
+          "$ref": "{primitive.fontSize.base}"
+        },
+        "size-lg": {
+          "$value": "var(--primitive-fontSize-2xl)",
+          "$type": "dimension",
+          "$ref": "{primitive.fontSize.2xl}"
+        },
+        "weight": {
+          "$value": "var(--primitive-fontWeight-extrabold)",
+          "$type": "fontWeight",
+          "$ref": "{primitive.fontWeight.extrabold}"
+        },
+        "tracking": {
+          "$value": "var(--primitive-letterSpacing-tight)",
+          "$type": "dimension",
+          "$ref": "{primitive.letterSpacing.tight}"
+        },
+        "color": {
+          "$value": "currentColor",
+          "$type": "color"
+        }
+      },
+      "sub": {
+        "family": {
+          "$value": "var(--typography-font-heading)",
+          "$type": "fontFamily",
+          "$ref": "{semantic.typography.font-heading}"
+        },
+        "size": {
+          "$value": "var(--primitive-fontSize-micro)",
+          "$type": "dimension",
+          "$ref": "{primitive.fontSize.micro}"
+        },
+        "weight": {
+          "$value": "var(--primitive-fontWeight-semibold)",
+          "$type": "fontWeight",
+          "$ref": "{primitive.fontWeight.semibold}"
+        },
+        "tracking": {
+          "$value": "var(--primitive-letterSpacing-wide)",
+          "$type": "dimension",
+          "$ref": "{primitive.letterSpacing.wide}"
+        },
+        "color": {
+          "$value": "var(--color-brand)",
+          "$type": "color",
+          "$ref": "{semantic.color.brand}"
+        },
+        "offset": {
+          "$value": "2px",
+          "$type": "dimension"
+        }
+      },
+      "link": {
+        "radius": {
+          "$value": "var(--primitive-radius-md)",
+          "$type": "dimension",
+          "$ref": "{primitive.radius.md}"
+        },
+        "hover-opacity": {
+          "$value": "var(--primitive-opacity-hover)",
+          "$type": "number",
+          "$ref": "{primitive.opacity.hover}"
+        },
+        "active-opacity": {
+          "$value": "var(--primitive-opacity-active)",
+          "$type": "number",
+          "$ref": "{primitive.opacity.active}"
+        },
+        "transition": {
+          "$value": "var(--primitive-duration-fast)",
+          "$type": "duration",
+          "$ref": "{primitive.duration.fast}"
+        },
+        "focus-ring": {
+          "$value": "var(--color-focus-ring)",
+          "$type": "color",
+          "$ref": "{semantic.color.focus-ring}"
+        },
+        "focus-ring-width": {
+          "$value": "2px",
+          "$type": "dimension"
+        },
+        "focus-ring-offset": {
+          "$value": "2px",
+          "$type": "dimension"
+        }
+      }
+    }
+  }
+}

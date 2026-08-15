@@ -13,6 +13,7 @@ import {
   MessageSquare,
   LogOut,
 } from "lucide-react";
+import Logo from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -31,9 +32,8 @@ export default function AdminSidebar() {
   return (
     <aside className="w-[260px] h-screen bg-[#0F172A] flex flex-col py-6 sticky top-0 z-50 overflow-y-auto flex-shrink-0">
       {/* Logo */}
-      <div className="px-6 mb-9">
-        <h1 className="m-0 font-sans font-extrabold text-2xl text-white leading-none tracking-tight">Vaishnavi</h1>
-        <p className="mt-[2px] font-sans font-bold text-[11px] leading-tight tracking-[0.12em] text-[#EA580C] uppercase">Enterprises</p>
+      <div className="px-6 mb-9" style={{ color: "var(--color-ink-inverse)" }}>
+        <Logo size="md" emphasis />
       </div>
 
       {/* Navigation */}

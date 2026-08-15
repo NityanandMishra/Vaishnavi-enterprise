@@ -2,9 +2,18 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Search, ShoppingCart, Heart, User, Menu, X, Zap } from "lucide-react";
+import { Search, ShoppingCart, Heart, User, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Logo from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
+
+const categoryNav = [
+  { href: "/categories/electric-vehicles", label: "Electric Vehicles" },
+  { href: "/categories/fans", label: "Fans" },
+  { href: "/categories/led-lighting", label: "LED Lighting" },
+  { href: "/categories/ups-systems", label: "UPS & Backups" },
+  { href: "/categories", label: "All Categories" },
+];
 
 export default function StorefrontHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -22,40 +31,48 @@ export default function StorefrontHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 glass border-b border-white/5">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
+    <header className="sticky top-0 z-40 bg-surface border-b border-border-base shadow-sm">
+      <div className="max-w-content mx-auto px-4 lg:px-8 h-16 flex items-center gap-4">
+
+        {/* Mobile Menu Toggle */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden -ml-2 p-2.5 text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
+          aria-label="Menu"
+        >
+          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0 mr-4">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-brand-orange-500 to-brand-orange-700 shadow-lg shadow-brand-orange-900/40">
-            <Zap size={20} fill="white" color="white" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="font-heading font-bold text-base leading-tight text-white">Vaishnavi</p>
-            <p className="text-[10px] text-slate-400 leading-tight tracking-widest uppercase">Enterprises</p>
-          </div>
+        <Link
+          href="/"
+          aria-label="Vaishnavi Enterprises — home"
+          className="ve-logo-link flex-shrink-0 md:mr-4"
+          style={{ color: "var(--color-ink)" }}
+        >
+          <Logo size="md" />
         </Link>
 
         {/* Desktop Category Nav */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-          <Link href="/categories/electric-vehicles" className="hover:text-brand-orange-400 transition-colors">Electric Vehicles</Link>
-          <Link href="/categories/fans" className="hover:text-brand-orange-400 transition-colors">Fans</Link>
-          <Link href="/categories/led-lighting" className="hover:text-brand-orange-400 transition-colors">LED Lighting</Link>
-          <Link href="/categories/ups-systems" className="hover:text-brand-orange-400 transition-colors">UPS & Backups</Link>
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+          {categoryNav.map(({ href, label }) => (
+            <Link key={href} href={href} className="hover:text-brand-orange-600 transition-colors">
+              {label}
+            </Link>
+          ))}
         </nav>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
         {/* Desktop Search Bar */}
         <form
           onSubmit={handleSearch}
           className={cn(
-            "hidden md:flex items-center gap-2 bg-slate-800/60 border border-white/8 rounded-xl px-3 py-2 transition-all duration-300",
-            searchOpen ? "ring-1 ring-brand-orange-500/50 w-72" : "w-52"
+            "hidden lg:flex items-center gap-2 bg-surface-alt border border-border-base rounded-md px-3 py-2 transition-all duration-300",
+            searchOpen ? "ring-2 ring-slate-900 w-72" : "w-52"
           )}
         >
-          <Search size={16} className="text-slate-500 flex-shrink-0" />
+          <Search size={16} className="text-muted flex-shrink-0" />
           <input
             type="text"
             placeholder="Search products…"
@@ -63,16 +80,15 @@ export default function StorefrontHeader() {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setSearchOpen(true)}
             onBlur={() => !searchQuery && setSearchOpen(false)}
-            className="bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none w-full"
+            className="bg-transparent text-sm text-slate-900 placeholder-muted outline-none w-full"
           />
         </form>
 
         {/* Action Icons */}
         <div className="flex items-center gap-1">
-          {/* Mobile Search Toggle */}
           <button
             onClick={() => setSearchOpen(!searchOpen)}
-            className="md:hidden p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            className="lg:hidden p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
             aria-label="Search"
           >
             <Search size={22} />
@@ -80,7 +96,7 @@ export default function StorefrontHeader() {
 
           <Link
             href="/wishlist"
-            className="hidden sm:flex p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            className="hidden sm:flex p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
             aria-label="Wishlist"
           >
             <Heart size={22} />
@@ -88,7 +104,7 @@ export default function StorefrontHeader() {
 
           <Link
             href="/cart"
-            className="relative p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            className="p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
             aria-label="Cart"
           >
             <ShoppingCart size={22} />
@@ -96,66 +112,52 @@ export default function StorefrontHeader() {
 
           <Link
             href="/account"
-            className="hidden sm:flex p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+            className="hidden sm:flex p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
             aria-label="Account"
           >
             <User size={22} />
           </Link>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
-            aria-label="Menu"
-          >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
         </div>
       </div>
 
       {/* Mobile Search Overlay */}
       {searchOpen && (
-        <div className="md:hidden px-4 pb-3 border-b border-white/5">
-          <form onSubmit={handleSearch} className="flex items-center gap-2 bg-slate-800/60 border border-white/8 rounded-xl px-3 py-2.5 ring-1 ring-brand-orange-500/50">
-            <Search size={16} className="text-slate-500 flex-shrink-0" />
+        <div className="lg:hidden px-4 pb-3 border-b border-border-base">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 bg-surface-alt border border-border-base rounded-md px-3 py-2.5 ring-2 ring-slate-900">
+            <Search size={16} className="text-muted flex-shrink-0" />
             <input
               type="text"
               placeholder="Search products…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
-              className="bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none flex-1"
+              className="bg-transparent text-sm text-slate-900 placeholder-muted outline-none flex-1"
             />
             {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery("")}>
-                <X size={16} className="text-slate-500" />
+              <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search">
+                <X size={16} className="text-muted" />
               </button>
             )}
           </form>
         </div>
       )}
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-white/5 glass">
+        <div className="md:hidden border-b border-border-base bg-surface">
           <nav className="flex flex-col px-4 py-3 gap-1">
-            {[
-              { href: "/categories/electric-vehicles", label: "🛵 Electric Vehicles" },
-              { href: "/categories/fans", label: "💨 Fans & Blowers" },
-              { href: "/categories/led-lighting", label: "💡 LED Lighting" },
-              { href: "/categories/ups-systems", label: "🔋 UPS & Power Backups" },
-              { href: "/wishlist", label: "♥ Wishlist" },
-              { href: "/account", label: "👤 My Account" },
-            ].map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="py-2.5 px-3 text-sm text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              >
-                {label}
-              </Link>
-            ))}
+            {[...categoryNav, { href: "/wishlist", label: "Wishlist" }, { href: "/account", label: "My Account" }].map(
+              ({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-3 px-3 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
+                >
+                  {label}
+                </Link>
+              )
+            )}
           </nav>
         </div>
       )}

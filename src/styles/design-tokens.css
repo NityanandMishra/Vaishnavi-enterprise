@@ -1,0 +1,94 @@
+/* Design Tokens - Auto-generated */
+/* Do not edit directly - modify tokens.json instead */
+
+/* === PRIMITIVES === */
+:root {
+  --primitive-color-brand-orange-50: #fff7ed;
+  --primitive-color-brand-orange-100: #ffedd5;
+  --primitive-color-brand-orange-200: #fed7aa;
+  --primitive-color-brand-orange-300: #fdba74;
+  --primitive-color-brand-orange-400: #fb923c;
+  --primitive-color-brand-orange-500: #f97316;
+  --primitive-color-brand-orange-600: #ea580c;
+  --primitive-color-brand-orange-700: #c2410c;
+  --primitive-color-brand-orange-800: #9a3412;
+  --primitive-color-brand-orange-900: #7c2d12;
+  --primitive-color-brand-orange-950: #431407;
+  --primitive-color-slate-50: #F8FAFC;
+  --primitive-color-slate-200: #E2E8F0;
+  --primitive-color-slate-400: #94A3B8;
+  --primitive-color-slate-900: #0F172A;
+  --primitive-color-slate-950: #131B2E;
+  --primitive-color-white: #FFFFFF;
+  --primitive-size-xs: 16px;
+  --primitive-size-sm: 24px;
+  --primitive-size-md: 36px;
+  --primitive-size-lg: 64px;
+  --primitive-spacing-1: 0.25rem;
+  --primitive-spacing-2: 0.5rem;
+  --primitive-spacing-3: 0.75rem;
+  --primitive-fontSize-micro: 0.625rem;
+  --primitive-fontSize-base: 1rem;
+  --primitive-fontSize-2xl: 1.5rem;
+  --primitive-fontWeight-semibold: 600;
+  --primitive-fontWeight-extrabold: 800;
+  --primitive-letterSpacing-tight: -0.02em;
+  --primitive-letterSpacing-wide: 0.18em;
+  --primitive-strokeWidth-mark: 5.5;
+  --primitive-radius-md: 0.375rem;
+  --primitive-opacity-hover: 0.85;
+  --primitive-opacity-active: 0.7;
+  --primitive-duration-fast: 150ms;
+}
+
+/* === SEMANTIC === */
+:root {
+  --color-brand: var(--primitive-color-brand-orange-600);
+  --color-brand-strong: var(--primitive-color-brand-orange-700);
+  --color-brand-soft: var(--primitive-color-brand-orange-500);
+  --color-ink: var(--primitive-color-slate-900);
+  --color-ink-muted: var(--primitive-color-slate-400);
+  --color-ink-inverse: var(--primitive-color-white);
+  --color-surface: var(--primitive-color-white);
+  --color-surface-inverse: var(--primitive-color-slate-950);
+  --color-focus-ring: var(--primitive-color-brand-orange-600);
+  --typography-font-heading: var(--font-inter), Inter, sans-serif;
+}
+
+/* === COMPONENTS === */
+:root {
+  --logo-gap: var(--primitive-spacing-2);
+  --logo-clearspace: 0.5em;
+  --logo-mark-size-xs: var(--primitive-size-xs);
+  --logo-mark-size-sm: var(--primitive-size-sm);
+  --logo-mark-size-md: var(--primitive-size-md);
+  --logo-mark-size-lg: var(--primitive-size-lg);
+  --logo-mark-min-size: var(--primitive-size-xs);
+  --logo-mark-ring: var(--color-brand);
+  --logo-mark-ring-width: var(--primitive-strokeWidth-mark);
+  --logo-mark-bolt: currentColor;
+  --logo-mark-arm-strong: var(--color-brand-strong);
+  --logo-mark-arm-soft: var(--color-brand-soft);
+  --logo-mark-rotor: var(--color-brand);
+  --logo-mark-tile-bg: var(--color-brand);
+  --logo-mark-tile-fg: var(--color-ink-inverse);
+  --logo-name-family: var(--typography-font-heading);
+  --logo-name-size: var(--primitive-fontSize-base);
+  --logo-name-size-lg: var(--primitive-fontSize-2xl);
+  --logo-name-weight: var(--primitive-fontWeight-extrabold);
+  --logo-name-tracking: var(--primitive-letterSpacing-tight);
+  --logo-name-color: currentColor;
+  --logo-sub-family: var(--typography-font-heading);
+  --logo-sub-size: var(--primitive-fontSize-micro);
+  --logo-sub-weight: var(--primitive-fontWeight-semibold);
+  --logo-sub-tracking: var(--primitive-letterSpacing-wide);
+  --logo-sub-color: var(--color-brand);
+  --logo-sub-offset: 2px;
+  --logo-link-radius: var(--primitive-radius-md);
+  --logo-link-hover-opacity: var(--primitive-opacity-hover);
+  --logo-link-active-opacity: var(--primitive-opacity-active);
+  --logo-link-transition: var(--primitive-duration-fast);
+  --logo-link-focus-ring: var(--color-focus-ring);
+  --logo-link-focus-ring-width: 2px;
+  --logo-link-focus-ring-offset: 2px;
+}

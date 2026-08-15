@@ -10,7 +10,9 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "tokens:build": "node scripts/generate-tokens.cjs --config design-tokens.json -o src/styles/design-tokens.css",
+    "tokens:check": "node scripts/validate-tokens.cjs --dir src/components/brand"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.4.2",

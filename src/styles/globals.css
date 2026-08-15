@@ -1,3 +1,7 @@
+/* Design tokens: primitive -> semantic -> component.
+   Generated from design-tokens.json by `npm run tokens:build`. */
+@import "./design-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,13 +13,13 @@
 
 body {
   font-family: var(--font-inter);
-  background-color: #F8FAFC; /* Light mode background */
-  color: #0F172A; /* Sleek dark slate text */
+  background-color: #F8FAFC;
+  color: #0F172A;
   overflow-x: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-inter); /* Standardized Inter for typography consistency */
+  font-family: var(--font-inter);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -29,16 +33,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .glass-accent {
-  background: rgba(234, 88, 12, 0.08); /* Light orange tint */
+  background: rgba(234, 88, 12, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(234, 88, 12, 0.15);
 }
 
 .glass-card {
-  background: #ffffff; /* Solid white background as per wireframe */
+  background: #ffffff;
   border: 1px solid #E2E8F0;
-  border-radius: 8px; /* 8px border radius as per wireframe */
+  border-radius: 8px;
   box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -46,6 +50,92 @@ h1, h2, h3, h4, h5, h6 {
 .glass-card:hover {
   border-color: #cbd5e1;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border-base rounded-lg;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* ── Logo ──────────────────────────────────────────────────────────────────
+   Consumes the --logo-* component tokens only. To restyle the mark, edit
+   design-tokens.json and re-run `npm run tokens:build` — never these rules. */
+@layer components {
+  .ve-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--logo-gap);
+  }
+
+  .ve-logo__mark {
+    flex: none;
+    min-width: var(--logo-mark-min-size);
+  }
+
+  .ve-logo__words {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+
+  .ve-logo__name {
+    font-family: var(--logo-name-family);
+    font-size: var(--logo-name-size);
+    font-weight: var(--logo-name-weight);
+    letter-spacing: var(--logo-name-tracking);
+    color: var(--logo-name-color);
+  }
+
+  .ve-logo__sub {
+    margin-top: var(--logo-sub-offset);
+    font-family: var(--logo-sub-family);
+    font-size: var(--logo-sub-size);
+    font-weight: var(--logo-sub-weight);
+    letter-spacing: var(--logo-sub-tracking);
+    line-height: 1.1;
+    text-transform: uppercase;
+    color: var(--logo-sub-color);
+  }
+
+  .ve-logo--lg .ve-logo__name {
+    font-size: var(--logo-name-size-lg);
+  }
+
+  /* Interactive states live on the link wrapper, not the lockup */
+  .ve-logo-link {
+    display: inline-flex;
+    border-radius: var(--logo-link-radius);
+    transition: opacity var(--logo-link-transition) ease;
+  }
+
+  .ve-logo-link:hover {
+    opacity: var(--logo-link-hover-opacity);
+  }
+
+  .ve-logo-link:active {
+    opacity: var(--logo-link-active-opacity);
+  }
+
+  .ve-logo-link:focus-visible {
+    outline: var(--logo-link-focus-ring-width) solid var(--logo-link-focus-ring);
+    outline-offset: var(--logo-link-focus-ring-offset);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ve-logo-link {
+      transition: none;
+    }
+  }
 }
 
 /* Custom scrollbars matching light theme */
@@ -69,7 +159,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Chrome autofill styling overrides */
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
+input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,

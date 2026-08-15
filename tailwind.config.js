@@ -1,3 +1,9 @@
+const tokens = require("./design-tokens.json");
+
+/** Flatten a primitive token group ({ "600": { $value } }) into a Tailwind scale. */
+const scale = (group) =>
+  Object.fromEntries(Object.entries(group).map(([step, token]) => [step, token.$value]));
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -8,25 +14,37 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Single source of truth: design-tokens.json primitive layer.
+        // Emitted as literal hex so opacity modifiers (bg-brand-orange-600/40)
+        // keep working. Edit the JSON, not this file.
         brand: {
-          orange: {
-            50: "#fff7ed",
-            100: "#ffedd5",
-            200: "#fed7aa",
-            300: "#fdba74",
-            400: "#fb923c",
-            500: "#f97316",
-            600: "#ea580c", // Core warm orange
-            700: "#c2410c",
-            800: "#9a3412",
-            900: "#7c2d12",
-            950: "#431407",
-          },
+          orange: scale(tokens.primitive.color.brand.orange),
         },
+        surface: {
+          DEFAULT: "#FFFFFF",
+          alt: "#F8FAFC",
+          sunken: "#EFF4FF",
+          inverse: "#131B2E",
+        },
+        border: {
+          base: "#E2E8F0",
+        },
+        muted: "#94A3B8",
+        success: "#16A34A",
+        danger: "#DC2626",
+        warning: "#D97706",
+        whatsapp: "#25D366",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "sans-serif"],
         heading: ["var(--font-inter)", "Inter", "sans-serif"],
+      },
+      borderRadius: {
+        md: "0.375rem",
+        lg: "0.5rem",
+      },
+      maxWidth: {
+        content: "1280px",
       },
     },
   },
