@@ -23,7 +23,9 @@ export default function ProductGallery({
   return (
     <div>
       <div className="relative w-full aspect-square bg-surface border border-border-base rounded-lg overflow-hidden">
-        {badge && <StockBadge state={badge} className="absolute top-3 left-3 z-10" />}
+        {/* Stays an overlay here — the gallery image is large enough to carry
+            it — but the tone is opaque so it holds over any photograph. */}
+        {badge && <StockBadge state={badge} className="absolute top-3 left-3 z-10 shadow-sm" />}
         {current ? (
           <Image
             src={current.url}

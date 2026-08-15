@@ -36,10 +36,6 @@ export default function ProductCard({
         className
       )}
     >
-      {product.badge && (
-        <StockBadge state={product.badge} className="absolute top-3 left-3 z-10" />
-      )}
-
       <Link href={`/products/${product.id}`} className="block">
         <div className="w-full aspect-square bg-surface-alt rounded-md overflow-hidden relative mb-3">
           {product.imageUrl ? (
@@ -57,10 +53,17 @@ export default function ProductCard({
           )}
         </div>
 
-        {product.brandName && (
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
-            {product.brandName}
-          </p>
+        {/* Status sits below the image well, not over it, so it stays legible
+            whatever the photograph behind it looks like. */}
+        {(product.badge || product.brandName) && (
+          <div className="flex items-center gap-2 mb-1.5">
+            {product.badge && <StockBadge state={product.badge} />}
+            {product.brandName && (
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">
+                {product.brandName}
+              </p>
+            )}
+          </div>
         )}
         <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2 group-hover:text-brand-orange-600 transition-colors">
           {product.title}
