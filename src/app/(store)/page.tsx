@@ -1,14 +1,28 @@
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ImageOff } from "lucide-react";
+import { ArrowRight, ImageOff, Sun, Lightbulb, ClipboardList } from "lucide-react";
 import { productCardInclude, toProductCardData } from "@/lib/catalog";
 import ProductCard from "@/components/store/ProductCard";
 import SectionHeading from "@/components/store/SectionHeading";
 import TrustStrip from "@/components/store/TrustStrip";
 
+/**
+ * Solar section highlights, kept in step with /solar.
+ *
+ * The wireframe paired "Industrial Solar Setup" with "EV Fleet Solutions", but
+ * the business does neither: commercial rooftop is a future offering and EV
+ * charging infrastructure is not a service at all. What it does deliver is
+ * residential rooftop and solar lighting, so the section advertises only those.
+ */
+const solarHighlights = [
+  { icon: Sun, title: "Rooftop solar for homes", body: "Sized to your actual bill, surveyed before quoting." },
+  { icon: Lightbulb, title: "Solar lighting", body: "Street, gate, and outdoor lights with no added meter load." },
+  { icon: ClipboardList, title: "Free site assessment", body: "We measure and propose at no cost or obligation." },
+];
+
 export default async function HomePage() {
-  const [topCategories, bestSellers, inquiryCategories] = await Promise.all([
+  const [topCategories, bestSellers] = await Promise.all([
     prisma.category.findMany({
       where: { parentId: null },
       orderBy: { sortOrder: "asc" },
@@ -20,12 +34,6 @@ export default async function HomePage() {
       orderBy: { createdAt: "desc" },
       take: 8,
       include: productCardInclude,
-    }),
-    prisma.category.findMany({
-      where: { parentId: null, defaultCheckoutMode: "INQUIRE" },
-      orderBy: { sortOrder: "asc" },
-      include: { image: true },
-      take: 2,
     }),
   ]);
 
@@ -136,39 +144,50 @@ export default async function HomePage() {
       </div>
 
       {/* ── Consultancy & Setup ──────────────────────────────────────── */}
-      {inquiryCategories.length > 0 && (
-        <section className="max-w-content mx-auto px-4 lg:px-8 pt-12 lg:pt-16">
-          <SectionHeading title="Consultancy & Setup" />
-          <div className="grid gap-4 md:grid-cols-2">
-            {inquiryCategories.map((cat) => (
+      <section className="max-w-content mx-auto px-4 lg:px-8 pt-12 lg:pt-16">
+        <div className="relative rounded-lg overflow-hidden bg-surface-inverse">
+          <div
+            className="absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 80% 25%, rgba(234,88,12,0.55), transparent 55%), radial-gradient(circle at 10% 85%, rgba(73,124,255,0.35), transparent 50%)",
+            }}
+          />
+          <div className="relative z-10 p-6 lg:p-10 lg:flex lg:items-center lg:gap-12">
+            <div className="lg:flex-1">
+              <span className="inline-block text-xs font-bold uppercase tracking-widest text-brand-orange-400 mb-2">
+                Solar Solutions
+              </span>
+              <h2 className="text-2xl lg:text-3xl font-bold text-white mb-3 max-w-lg">
+                Lower your electricity bill, permanently
+              </h2>
+              <p className="text-sm lg:text-base text-slate-300 mb-6 max-w-lg">
+                Rooftop solar for homes and housing societies, plus solar lighting for gates,
+                lanes, and outdoor areas. We survey your site before we quote.
+              </p>
               <Link
-                key={cat.id}
-                href={`/categories/${cat.slug}`}
-                className="group relative rounded-lg overflow-hidden bg-surface-inverse min-h-[180px] flex items-center p-6 lg:p-8"
+                href="/solar"
+                className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-md bg-brand-orange-600 text-white text-sm font-bold uppercase tracking-wide hover:opacity-90 transition-opacity"
               >
-                {cat.image && (
-                  <Image
-                    src={cat.image.url}
-                    alt=""
-                    fill
-                    className="object-cover opacity-30 group-hover:scale-105 transition-transform duration-500"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                  />
-                )}
-                <div className="relative z-10">
-                  <h3 className="text-xl font-semibold text-white mb-1">{cat.name}</h3>
-                  {cat.description && (
-                    <p className="text-sm text-slate-300 mb-4 max-w-sm">{cat.description}</p>
-                  )}
-                  <span className="inline-flex items-center gap-1.5 text-sm font-bold text-white">
-                    Inquire Now <ArrowRight size={16} />
-                  </span>
-                </div>
+                Book a free site assessment
+                <ArrowRight size={16} />
               </Link>
-            ))}
+            </div>
+
+            <ul className="grid gap-3 mt-8 lg:mt-0 lg:w-[340px] flex-shrink-0">
+              {solarHighlights.map(({ icon: Icon, title, body }) => (
+                <li key={title} className="flex gap-3 bg-white/5 rounded-md p-3.5">
+                  <Icon size={18} className="text-brand-orange-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="block text-sm font-semibold text-white">{title}</span>
+                    <span className="block text-xs text-slate-400 leading-relaxed">{body}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* ── About ────────────────────────────────────────────────────── */}
       <section className="max-w-content mx-auto px-4 lg:px-8 pt-12 lg:pt-16 pb-4">

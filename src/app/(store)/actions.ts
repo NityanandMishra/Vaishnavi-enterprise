@@ -197,6 +197,88 @@ export async function submitLead(_prev: unknown, formData: FormData) {
   return { ok: true as const };
 }
 
+/**
+ * Solar consultancy inquiry.
+ *
+ * Distinct from submitLead, which requires an existing productId — a solar
+ * enquiry is about a service, so it lands in the same Lead queue with a
+ * synthetic productName and the qualification answers folded into `message`,
+ * where /admin/leads already renders them.
+ */
+const SOLAR_INTERESTS = {
+  ROOFTOP: "Rooftop solar for home",
+  LIGHTING: "Solar lighting",
+  UNSURE: "Needs advice",
+} as const;
+
+const solarInquirySchema = z.object({
+  name: z.string().trim().min(2, "Please enter your name.").max(80),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^(\+91[\s-]?)?[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number."),
+  email: z.string().trim().email("Enter a valid email address.").optional().or(z.literal("")),
+  city: z.string().trim().min(2, "Please enter your city.").max(80),
+  pincode: z.string().trim().regex(/^\d{6}$/, "Enter a valid 6-digit pincode."),
+  interest: z.enum(["ROOFTOP", "LIGHTING", "UNSURE"]),
+  propertyType: z.string().trim().max(60).optional().or(z.literal("")),
+  monthlyBill: z.string().trim().max(40).optional().or(z.literal("")),
+  roofArea: z.string().trim().max(40).optional().or(z.literal("")),
+  timeline: z.string().trim().max(40).optional().or(z.literal("")),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+export async function submitSolarInquiry(_prev: unknown, formData: FormData) {
+  const parsed = solarInquirySchema.safeParse({
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+    email: formData.get("email") ?? "",
+    city: formData.get("city"),
+    pincode: formData.get("pincode"),
+    interest: formData.get("interest"),
+    propertyType: formData.get("propertyType") ?? "",
+    monthlyBill: formData.get("monthlyBill") ?? "",
+    roofArea: formData.get("roofArea") ?? "",
+    timeline: formData.get("timeline") ?? "",
+    notes: formData.get("notes") ?? "",
+  });
+
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues[0].message };
+  }
+
+  const d = parsed.data;
+
+  // The bill band is captured for our own sizing; it is never shown back to the
+  // customer, since the real number comes out of the site survey.
+  const summary = [
+    `Interest: ${SOLAR_INTERESTS[d.interest]}`,
+    d.propertyType && `Property: ${d.propertyType}`,
+    d.monthlyBill && `Monthly bill: ${d.monthlyBill}`,
+    d.roofArea && `Roof area: ${d.roofArea}`,
+    d.timeline && `Timeline: ${d.timeline}`,
+    d.notes && `Notes: ${d.notes}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const lead = await prisma.lead.create({
+    data: {
+      name: d.name,
+      phone: d.phone,
+      email: d.email || null,
+      city: d.city,
+      pincode: d.pincode,
+      message: summary,
+      productId: null,
+      productName: `Solar enquiry — ${SOLAR_INTERESTS[d.interest]}`,
+      sourceUrl: "/solar",
+    },
+  });
+
+  return { ok: true as const, reference: lead.id.slice(0, 8).toUpperCase() };
+}
+
 /** Placeholder serviceability check — every Indian pincode is treated as deliverable. */
 export async function checkPincode(pincode: string) {
   if (!/^\d{6}$/.test(pincode)) {
