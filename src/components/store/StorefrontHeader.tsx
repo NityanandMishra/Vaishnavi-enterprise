@@ -48,8 +48,7 @@ export default function StorefrontHeader() {
           aria-label="Vaishnavi Enterprises — home"
           className="flex-shrink-0 md:mr-4"
         >
-          {/* TODO: replace /logo.svg with the real brand file in public/ */}
-          <img src="/logo.svg" alt="Vaishnavi Enterprises" className="h-9 w-auto" />
+          <img src="/logo.png" alt="Vaishnavi Enterprises" className="h-10 w-auto object-contain" />
         </Link>
 
         {/* Desktop Category Nav */}

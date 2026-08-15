@@ -32,9 +32,7 @@ export default function AdminSidebar() {
     <aside className="w-[260px] h-screen bg-[#0F172A] flex flex-col py-6 sticky top-0 z-50 overflow-y-auto flex-shrink-0">
       {/* Logo */}
       <div className="px-6 mb-9">
-        {/* TODO: replace /logo.svg with the real brand file in public/.
-            Sidebar sits on a dark surface — an inverse variant may be needed. */}
-        <img src="/logo.svg" alt="Vaishnavi Enterprises" className="h-9 w-auto" />
+        <img src="/logo-inverse.png" alt="Vaishnavi Enterprises" className="h-10 w-auto object-contain" />
       </div>
 
       {/* Navigation */}

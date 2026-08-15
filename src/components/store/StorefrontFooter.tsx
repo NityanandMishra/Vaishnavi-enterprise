@@ -43,9 +43,7 @@ export default function StorefrontFooter() {
               aria-label="Vaishnavi Enterprises — home"
               className="inline-flex mb-4"
             >
-              {/* TODO: replace /logo.svg with the real brand file in public/.
-                  Footer sits on a dark surface — an inverse variant may be needed. */}
-              <img src="/logo.svg" alt="Vaishnavi Enterprises" className="h-9 w-auto" />
+              <img src="/logo-inverse.png" alt="Vaishnavi Enterprises" className="h-10 w-auto object-contain" />
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed mb-4">
               Technical expertise for industrial-grade solar, EV, LED, and electrical components. Suriyawan, Bhadohi.
