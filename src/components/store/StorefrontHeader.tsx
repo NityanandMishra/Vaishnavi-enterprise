@@ -33,6 +33,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const megaRef = useRef<HTMLDivElement>(null);
+  const megaPanelRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -65,7 +66,15 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
       if (e.key === "Escape") setMegaOpen(false);
     }
     function onPointer(e: MouseEvent) {
-      if (megaRef.current && !megaRef.current.contains(e.target as Node)) setMegaOpen(false);
+      const target = e.target as Node;
+      // The panel is a sibling of the trigger, not a descendant, so it has to
+      // be tested separately. Checking only the trigger treated every click
+      // inside the panel as an outside click: mousedown unmounted the panel
+      // before mouseup, the anchor vanished, and the click never fired — the
+      // menu closed and navigation silently never happened.
+      const insideTrigger = megaRef.current?.contains(target);
+      const insidePanel = megaPanelRef.current?.contains(target);
+      if (!insideTrigger && !insidePanel) setMegaOpen(false);
     }
 
     document.addEventListener("keydown", onKey);
@@ -203,6 +212,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
       {megaOpen && (
         <div
           id="mega-menu"
+          ref={megaPanelRef}
           className="hidden md:block absolute left-0 right-0 top-full bg-surface border-b border-border-base shadow-lg"
         >
           <div className="max-w-content mx-auto px-4 lg:px-8 py-6 max-h-[70vh] overflow-y-auto">
