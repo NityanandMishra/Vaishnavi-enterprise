@@ -33,6 +33,8 @@ const categorySchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase letters/numbers separated by hyphens"),
   description: z.string().optional(),
   sortOrder: z.number().int("Sort order must be a whole number").min(0, "Sort order must be 0 or more"),
+  // An image is mandatory: unillustrated entries render as blank cards on the storefront
+  imageId: z.string().min(1, "An image is required"),
   // parentId validation is handled separately based on isSubcategory context
 });
 
@@ -40,7 +42,7 @@ const subcategorySchema = categorySchema.extend({
   parentId: z.string().min(1, "Please select a parent category"),
 });
 
-type FieldErrors = Partial<Record<"name" | "slug" | "description" | "sortOrder" | "parentId", string>>;
+type FieldErrors = Partial<Record<"name" | "slug" | "description" | "sortOrder" | "parentId" | "imageId", string>>;
 
 // ── Interfaces ─────────────────────────────────────────────────────────────────
 
@@ -234,6 +236,7 @@ export default function CategoriesPage() {
       slug: formSlug,
       description: formDesc || undefined,
       sortOrder: formSortOrder,
+      imageId: formImageId ?? "",
       ...(isSubcategoryForm ? { parentId: formParentId } : {}),
     };
 
@@ -758,6 +761,7 @@ export default function CategoriesPage() {
               <div className="space-y-2">
                 <label className="text-xs text-[#475569] font-bold block">
                   {isSubcategoryForm ? "Subcategory Banner Image" : "Category Banner Image"}
+                  <span className="text-rose-600 ml-0.5">*</span>
                 </label>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-[6px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -789,6 +793,10 @@ export default function CategoriesPage() {
                     </button>
                   )}
                 </div>
+
+                {fieldErrors.imageId && (
+                  <p className="text-xs text-rose-600 font-semibold">{fieldErrors.imageId}</p>
+                )}
 
                 {/* Banner Image Selector Panel */}
                 {showImageSelector && (

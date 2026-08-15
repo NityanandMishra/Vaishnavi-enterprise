@@ -239,6 +239,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     if (!basePrice.trim()) return setError("Base price is required");
     if (Number(basePrice) < 0) return setError("Base price cannot be negative");
     if (!categoryId) return setError("Category is required");
+    if (selectedImages.length === 0)
+      return setError("At least one product image is required");
 
     setSubmitting(true);
     setError(null);

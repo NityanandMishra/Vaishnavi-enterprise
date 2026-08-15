@@ -67,6 +67,12 @@ export async function createCategory(data: {
       throw new Error("Category name is required");
     }
 
+    if (!data.imageId) {
+      throw new Error(
+        `An image is required to publish a ${data.parentId ? "subcategory" : "category"}.`
+      );
+    }
+
     const slug = data.slug?.trim()
       ? data.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-")
       : data.name
@@ -133,6 +139,12 @@ export async function updateCategory(
   try {
     if (!data.name.trim()) {
       throw new Error("Category name is required");
+    }
+
+    if (!data.imageId) {
+      throw new Error(
+        `An image is required to publish a ${data.parentId ? "subcategory" : "category"}.`
+      );
     }
 
     const slug = data.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");

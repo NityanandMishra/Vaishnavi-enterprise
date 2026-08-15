@@ -129,6 +129,8 @@ export async function createProduct(data: {
   try {
     if (!data.title.trim()) throw new Error("Title is required");
     if (!data.categoryId) throw new Error("Category is required");
+    if (data.images.length === 0)
+      throw new Error("At least one image is required to publish a product.");
 
     // Perform database operations in a transaction
     const newProduct = await prisma.$transaction(async (tx) => {
@@ -228,6 +230,8 @@ export async function updateProduct(
   try {
     if (!data.title.trim()) throw new Error("Title is required");
     if (!data.categoryId) throw new Error("Category is required");
+    if (data.images.length === 0)
+      throw new Error("At least one image is required to publish a product.");
 
     await prisma.$transaction(async (tx) => {
       // 1. Update product base data

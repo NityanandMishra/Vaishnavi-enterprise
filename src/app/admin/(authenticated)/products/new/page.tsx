@@ -192,6 +192,11 @@ export default function NewProductPage() {
       return;
     }
 
+    if (selectedImages.length === 0) {
+      setError("Please add at least one product image");
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
