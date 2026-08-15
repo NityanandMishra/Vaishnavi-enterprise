@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Phone, Mail, MapPin, Instagram, Facebook, ShieldCheck, Truck, Banknote } from "lucide-react";
-import Logo from "@/components/brand/Logo";
 import { ownerWhatsAppUrl } from "@/lib/utils";
 
 const footerLinks = {
@@ -42,10 +41,11 @@ export default function StorefrontFooter() {
             <Link
               href="/"
               aria-label="Vaishnavi Enterprises — home"
-              className="ve-logo-link mb-4"
-              style={{ color: "var(--color-ink-inverse)" }}
+              className="inline-flex mb-4"
             >
-              <Logo size="md" />
+              {/* TODO: replace /logo.svg with the real brand file in public/.
+                  Footer sits on a dark surface — an inverse variant may be needed. */}
+              <img src="/logo.svg" alt="Vaishnavi Enterprises" className="h-9 w-auto" />
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed mb-4">
               Technical expertise for industrial-grade solar, EV, LED, and electrical components. Suriyawan, Bhadohi.

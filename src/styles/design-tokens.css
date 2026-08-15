@@ -57,38 +57,5 @@
 
 /* === COMPONENTS === */
 :root {
-  --logo-gap: var(--primitive-spacing-2);
-  --logo-clearspace: 0.5em;
-  --logo-mark-size-xs: var(--primitive-size-xs);
-  --logo-mark-size-sm: var(--primitive-size-sm);
-  --logo-mark-size-md: var(--primitive-size-md);
-  --logo-mark-size-lg: var(--primitive-size-lg);
-  --logo-mark-min-size: var(--primitive-size-xs);
-  --logo-mark-ring: var(--color-brand);
-  --logo-mark-ring-width: var(--primitive-strokeWidth-mark);
-  --logo-mark-bolt: currentColor;
-  --logo-mark-arm-strong: var(--color-brand-strong);
-  --logo-mark-arm-soft: var(--color-brand-soft);
-  --logo-mark-rotor: var(--color-brand);
-  --logo-mark-tile-bg: var(--color-brand);
-  --logo-mark-tile-fg: var(--color-ink-inverse);
-  --logo-name-family: var(--typography-font-heading);
-  --logo-name-size: var(--primitive-fontSize-base);
-  --logo-name-size-lg: var(--primitive-fontSize-2xl);
-  --logo-name-weight: var(--primitive-fontWeight-extrabold);
-  --logo-name-tracking: var(--primitive-letterSpacing-tight);
-  --logo-name-color: currentColor;
-  --logo-sub-family: var(--typography-font-heading);
-  --logo-sub-size: var(--primitive-fontSize-micro);
-  --logo-sub-weight: var(--primitive-fontWeight-semibold);
-  --logo-sub-tracking: var(--primitive-letterSpacing-wide);
-  --logo-sub-color: var(--color-brand);
-  --logo-sub-offset: 2px;
-  --logo-link-radius: var(--primitive-radius-md);
-  --logo-link-hover-opacity: var(--primitive-opacity-hover);
-  --logo-link-active-opacity: var(--primitive-opacity-active);
-  --logo-link-transition: var(--primitive-duration-fast);
-  --logo-link-focus-ring: var(--color-focus-ring);
-  --logo-link-focus-ring-width: 2px;
-  --logo-link-focus-ring-offset: 2px;
+
 }

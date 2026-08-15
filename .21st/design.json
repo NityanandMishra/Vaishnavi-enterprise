@@ -34,17 +34,7 @@
     "must": [],
     "avoid": []
   },
-  "decisions": [
-    {
-      "id": "brand-mark-2026-08",
-      "date": "2026-08-15",
-      "topic": "Brand logo",
-      "choice": "ring",
-      "summary": "Vaishnavi Enterprises mark is the 'Power Ring': an open power-symbol ring in brand-orange-600 with a bolt passing through the 12 o'clock gap. Implemented in src/components/brand/Logo.tsx; three alternates (monogram, badge, rotor) ship behind the same `variant` prop.",
-      "rationale": "Covers the whole catalogue (EV, UPS, fans, LED) rather than one category, stays legible at 16px, works one-colour, and replaces the generic lucide `Zap` placeholder. Flat fills only, matching the light token set.",
-      "usage": "Wordmark: Inter extrabold 'Vaishnavi' over uppercase 'Enterprises' at 0.18em tracking in brand-orange-600. The mark's bolt uses currentColor, so set text-slate-900 on light surfaces and text-white on surface-inverse."
-    }
-  ],
+  "decisions": [],
   "evidence": [
     {
       "fact": "project.stack:nextjs",

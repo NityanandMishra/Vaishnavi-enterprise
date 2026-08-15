@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { Search, ShoppingCart, Heart, User, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Logo from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 
 const categoryNav = [
@@ -47,10 +46,10 @@ export default function StorefrontHeader() {
         <Link
           href="/"
           aria-label="Vaishnavi Enterprises — home"
-          className="ve-logo-link flex-shrink-0 md:mr-4"
-          style={{ color: "var(--color-ink)" }}
+          className="flex-shrink-0 md:mr-4"
         >
-          <Logo size="md" />
+          {/* TODO: replace /logo.svg with the real brand file in public/ */}
+          <img src="/logo.svg" alt="Vaishnavi Enterprises" className="h-9 w-auto" />
         </Link>
 
         {/* Desktop Category Nav */}
