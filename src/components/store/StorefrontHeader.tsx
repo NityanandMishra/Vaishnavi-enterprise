@@ -38,10 +38,14 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
 
   const pinned = categories.slice(0, PINNED_LIMIT);
 
-  // Close both menus whenever navigation happens.
+  // The header sits in the layout and never remounts, so every transient bit
+  // of open state has to be cleared by hand on navigation — the search overlay
+  // included, or it stays pinned open over whatever page you land on.
   useEffect(() => {
     setMegaOpen(false);
     setMobileMenuOpen(false);
+    setSearchOpen(false);
+    setSearchQuery("");
   }, [pathname]);
 
   useEffect(() => {
