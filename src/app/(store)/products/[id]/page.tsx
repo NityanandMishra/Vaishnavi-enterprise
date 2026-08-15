@@ -89,7 +89,10 @@ export default async function ProductPage({ params }: { params: { id: string } }
           badge={badge}
         />
 
-        <div className="mt-6 lg:mt-0 lg:sticky lg:top-24">
+        {/* Not sticky. Pinning this column made it lag behind the gallery as
+            the page scrolled, so the two halves of the same section visibly
+            came apart. Both columns now move as one block. */}
+        <div className="mt-6 lg:mt-0">
           {product.brand && (
             <p className="text-xs font-bold uppercase tracking-widest text-brand-orange-600 mb-2">
               {product.brand.name}
