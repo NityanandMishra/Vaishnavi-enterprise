@@ -67,6 +67,65 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ── Hero carousel motion ───────────────────────────────────────────────────
+   Ken Burns drift on the active slide plus a staggered entrance for its copy.
+   Every rule here is disabled under prefers-reduced-motion at the foot of the
+   block, so the carousel degrades to plain crossfades. */
+@keyframes heroKenBurns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.09) translate3d(0, -1.2%, 0);
+  }
+}
+
+@keyframes heroProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes heroRiseIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.hero-kenburns {
+  animation: heroKenBurns var(--hero-duration, 7000ms) linear forwards;
+}
+
+.hero-rise > * {
+  opacity: 0;
+  animation: heroRiseIn 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Stagger the copy so the eyebrow, headline, blurb and buttons cascade. */
+.hero-rise > *:nth-child(1) { animation-delay: 60ms; }
+.hero-rise > *:nth-child(2) { animation-delay: 140ms; }
+.hero-rise > *:nth-child(3) { animation-delay: 220ms; }
+.hero-rise > *:nth-child(4) { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-kenburns,
+  .hero-rise > * {
+    animation: none;
+  }
+
+  .hero-rise > * {
+    opacity: 1;
+  }
+}
+
 /* Custom scrollbars matching light theme */
 ::-webkit-scrollbar {
   width: 8px;

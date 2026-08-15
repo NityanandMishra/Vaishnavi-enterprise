@@ -4,6 +4,7 @@ import Image from "next/image";
 import { ArrowRight, ImageOff, Sun, Lightbulb, ClipboardList } from "lucide-react";
 import { productCardInclude, toProductCardData } from "@/lib/catalog";
 import ProductCard from "@/components/store/ProductCard";
+import HeroCarousel from "@/components/store/HeroCarousel";
 import SectionHeading from "@/components/store/SectionHeading";
 import TrustStrip from "@/components/store/TrustStrip";
 
@@ -40,44 +41,7 @@ export default async function HomePage() {
   return (
     <>
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="relative bg-surface-inverse overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-30"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 75% 30%, rgba(234,88,12,0.55), transparent 55%), radial-gradient(circle at 15% 80%, rgba(73,124,255,0.35), transparent 50%)",
-          }}
-          aria-hidden
-        />
-        <div className="relative max-w-content mx-auto px-4 lg:px-8 py-16 lg:py-28">
-          <div className="max-w-2xl">
-            <span className="inline-block bg-brand-orange-600 text-white text-[11px] font-bold px-3 py-1.5 uppercase tracking-widest rounded-sm mb-4">
-              Premium Energy Solutions
-            </span>
-            <h1 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-4">
-              Engineered for Maximum Efficiency
-            </h1>
-            <p className="text-base lg:text-lg text-slate-300 mb-8 max-w-lg leading-relaxed">
-              Tier-1 solar panels, EV infrastructure, LED lighting and electrical
-              components for industrial and residential projects. Delivered pan-India.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link
-                href="/categories"
-                className="inline-flex items-center justify-center gap-2 min-h-[48px] px-8 rounded-md bg-brand-orange-600 text-white font-bold text-sm uppercase tracking-wide hover:opacity-90 transition-opacity"
-              >
-                Explore Products <ArrowRight size={18} />
-              </Link>
-              <Link
-                href="/search"
-                className="inline-flex items-center justify-center min-h-[48px] px-8 rounded-md bg-white/10 border border-white/20 text-white font-bold text-sm uppercase tracking-wide hover:bg-white/20 transition-colors"
-              >
-                Get a Quote
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroCarousel />
 
       {/* ── Category Grid ────────────────────────────────────────────── */}
       {topCategories.length > 0 && (
