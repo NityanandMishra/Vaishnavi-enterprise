@@ -54,16 +54,18 @@ export default function ProductCard({
         </div>
 
         {/* Status sits below the image well, not over it, so it stays legible
-            whatever the photograph behind it looks like. */}
-        {(product.badge || product.brandName) && (
-          <div className="flex items-center gap-2 mb-1.5">
-            {product.badge && <StockBadge state={product.badge} />}
-            {product.brandName && (
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">
-                {product.brandName}
-              </p>
-            )}
-          </div>
+            whatever the photograph behind it looks like — and on its own row,
+            so the brand line starts at the same x on every card in a grid.
+            The row keeps its height when a badge is missing to stop cards
+            shifting relative to one another. */}
+        <div className="flex items-center min-h-[23px] mb-1.5">
+          {product.badge && <StockBadge state={product.badge} />}
+        </div>
+
+        {product.brandName && (
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate mb-1">
+            {product.brandName}
+          </p>
         )}
         <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2 group-hover:text-brand-orange-600 transition-colors">
           {product.title}
