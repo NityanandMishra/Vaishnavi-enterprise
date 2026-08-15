@@ -46,6 +46,13 @@ module.exports = {
       maxWidth: {
         content: "1280px",
       },
+      // Explicit layering. Dialogs previously shared z-50 with the mobile
+      // bottom nav and the admin sidebar, so site chrome painted over them.
+      zIndex: {
+        chrome: "40",
+        "chrome-top": "50",
+        modal: "100",
+      },
     },
   },
   plugins: [],

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { SlidersHorizontal, ArrowUpDown, X, Check } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Modal from "@/components/ui/Modal";
 
 export const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
@@ -141,24 +142,14 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
       </aside>
 
       {/* Mobile bottom sheet */}
-      {sheet && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end">
-          <button
-            className="absolute inset-0 bg-slate-900/40"
-            onClick={() => setSheet(null)}
-            aria-label="Close"
-          />
-          <div className="relative w-full bg-surface rounded-t-xl max-h-[75vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-surface flex items-center justify-between px-4 py-4 border-b border-border-base">
-              <h2 className="text-base font-semibold text-slate-900">
-                {sheet === "filter" ? "Filter" : "Sort By"}
-              </h2>
-              <button onClick={() => setSheet(null)} className="p-2 -mr-2 text-slate-500" aria-label="Close">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-4 pb-8">
+      <Modal
+        open={sheet !== null}
+        onClose={() => setSheet(null)}
+        title={sheet === "filter" ? "Filter" : "Sort By"}
+        variant="sheet"
+        className="lg:hidden"
+      >
+        <div className="p-4 pb-8">
               {sheet === "sort" ? (
                 <ul className="space-y-1">
                   {SORT_OPTIONS.map((o) => (
@@ -216,10 +207,8 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
                   )}
                 </>
               )}
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </>
   );
 }

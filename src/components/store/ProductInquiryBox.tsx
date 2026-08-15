@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FileText, MessageCircle, Check, AlertCircle, X } from "lucide-react";
+import { FileText, MessageCircle, Check, AlertCircle } from "lucide-react";
 import { cn, formatINR, ownerWhatsAppUrl } from "@/lib/utils";
 import { submitLead } from "@/app/(store)/actions";
+import Modal from "@/components/ui/Modal";
 
 export default function ProductInquiryBox({
   productId,
@@ -93,22 +94,13 @@ export default function ProductInquiryBox({
       </div>
 
       {/* Quote request modal */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
-          <button
-            className="absolute inset-0 bg-slate-900/40"
-            onClick={() => setOpen(false)}
-            aria-label="Close"
-          />
-          <div className="relative w-full lg:max-w-md bg-surface rounded-t-xl lg:rounded-lg max-h-[85vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-surface flex items-center justify-between px-5 py-4 border-b border-border-base">
-              <h2 className="text-base font-semibold text-slate-900">Request a Quote</h2>
-              <button onClick={() => setOpen(false)} className="p-2 -mr-2 text-slate-500" aria-label="Close">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Request a Quote"
+        variant="sheet"
+      >
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <p className="text-sm text-slate-600">
                 For <span className="font-semibold text-slate-900">{productTitle}</span>
               </p>
@@ -168,10 +160,8 @@ export default function ProductInquiryBox({
               >
                 {isPending ? "Submitting…" : "Submit Request"}
               </button>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 }

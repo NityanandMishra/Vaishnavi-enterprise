@@ -22,6 +22,7 @@ import {
   Folder,
   ChevronRight,
 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 // ── Zod Schemas ────────────────────────────────────────────────────────────────
 
@@ -579,35 +580,28 @@ export default function CategoriesPage() {
       )}
 
       {/* ── Create/Edit Modal ───────────────────────────────────────── */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-[#0F172A]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E8F0] rounded-[8px] max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-[#E2E8F0] flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <h3 className="font-sans font-bold text-[#0F172A] text-lg">
-                  {editingCategory
-                    ? (isSubcategoryForm ? "Edit Subcategory" : "Edit Category")
-                    : (isSubcategoryForm ? "Create Subcategory" : "Create Category")}
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="text-slate-400 hover:text-[#0F172A] cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <p className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider mt-0.5">
+      <Modal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        title={
+          editingCategory
+            ? isSubcategoryForm
+              ? "Edit Subcategory"
+              : "Edit Category"
+            : isSubcategoryForm
+              ? "Create Subcategory"
+              : "Create Category"
+        }
+      >
+            {/* Modal Form */}
+            <form onSubmit={handleSave} noValidate className="p-5 space-y-4">
+              <p className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-wider -mt-1">
                 {isSubcategoryForm
                   ? `Catalog › Categories › ${selectedParent?.name || "Parent"} › ${editingCategory ? "Edit" : "New"} Subcategory`
                   : `Catalog › Categories › ${editingCategory ? "Edit" : "New"} Category`
                 }
               </p>
-            </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSave} noValidate className="p-5 space-y-4 overflow-y-auto flex-1">
               {/* Modal-level server error (slug duplicate, DB constraint, etc.) */}
               {formError && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-800 px-3 py-2.5 rounded-[6px] flex items-center gap-2 text-sm">
@@ -859,9 +853,7 @@ export default function CategoriesPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Image as ImageIcon,
 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
 
 interface Brand {
   id: string;
@@ -309,24 +310,12 @@ export default function BrandsPage() {
       )}
 
       {/* ── Create/Edit Modal ───────────────────────────────────────── */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-[#0F172A]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E2E8F0] rounded-[8px] max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-[#E2E8F0] flex items-center justify-between">
-              <h3 className="font-sans font-bold text-[#0F172A] text-lg">
-                {editingBrand ? "Edit Brand" : "Create Brand"}
-              </h3>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-slate-400 hover:text-[#0F172A] cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-5 space-y-4 overflow-y-auto flex-1">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingBrand ? "Edit Brand" : "Create Brand"}
+      >
+            <form onSubmit={handleSave} className="p-5 space-y-4">
               <div className="space-y-1">
                 <label className="text-xs text-[#475569] font-bold">Brand Name</label>
                 <input
@@ -457,9 +446,7 @@ export default function BrandsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }
