@@ -15,6 +15,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PINNED_LIMIT, type NavCategory } from "@/lib/nav";
+import ComingSoonTag from "./ComingSoonTag";
 
 /**
  * Storefront header.
@@ -202,16 +203,27 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
                   </Link>
                   {cat.children.length > 0 ? (
                     <ul className="space-y-1.5">
-                      {cat.children.map((sub) => (
-                        <li key={sub.id}>
-                          <Link
-                            href={`/categories/${sub.slug}`}
-                            className="block text-sm text-slate-600 hover:text-brand-orange-600 transition-colors truncate"
+                      {cat.children.map((sub) =>
+                        sub.comingSoon ? (
+                          <li
+                            key={sub.id}
+                            className="flex items-center gap-1.5 text-sm text-muted cursor-default"
+                            title="No products listed yet"
                           >
-                            {sub.name}
-                          </Link>
-                        </li>
-                      ))}
+                            <span className="truncate">{sub.name}</span>
+                            <ComingSoonTag />
+                          </li>
+                        ) : (
+                          <li key={sub.id}>
+                            <Link
+                              href={`/categories/${sub.slug}`}
+                              className="block text-sm text-slate-600 hover:text-brand-orange-600 transition-colors truncate"
+                            >
+                              {sub.name}
+                            </Link>
+                          </li>
+                        )
+                      )}
                     </ul>
                   ) : (
                     <p className="text-xs text-muted">Browse all items</p>
@@ -268,16 +280,26 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
                 </Link>
                 {cat.children.length > 0 && (
                   <ul className="pb-2">
-                    {cat.children.map((sub) => (
-                      <li key={sub.id}>
-                        <Link
-                          href={`/categories/${sub.slug}`}
-                          className="block py-2.5 pl-6 pr-3 -mx-1 text-sm text-slate-600 hover:bg-surface-alt rounded-md transition-colors"
+                    {cat.children.map((sub) =>
+                      sub.comingSoon ? (
+                        <li
+                          key={sub.id}
+                          className="flex items-center gap-2 py-2.5 pl-6 pr-3 -mx-1 text-sm text-muted"
                         >
                           {sub.name}
-                        </Link>
-                      </li>
-                    ))}
+                          <ComingSoonTag />
+                        </li>
+                      ) : (
+                        <li key={sub.id}>
+                          <Link
+                            href={`/categories/${sub.slug}`}
+                            className="block py-2.5 pl-6 pr-3 -mx-1 text-sm text-slate-600 hover:bg-surface-alt rounded-md transition-colors"
+                          >
+                            {sub.name}
+                          </Link>
+                        </li>
+                      )
+                    )}
                   </ul>
                 )}
               </div>

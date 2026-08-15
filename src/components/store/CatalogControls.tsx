@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, ArrowUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Modal from "@/components/ui/Modal";
+import ComingSoonTag from "./ComingSoonTag";
 
 export const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
@@ -114,27 +115,41 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
                 )}
               </div>
               <ul className="space-y-1">
-                {brands.map((b) => (
-                  <li key={b.id}>
-                    <button
-                      onClick={() => toggleBrand(b.id)}
-                      className="w-full flex items-center gap-2.5 py-2 px-2 -mx-2 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
+                {brands.map((b) =>
+                  b.count === 0 ? (
+                    // Listed so the brand is visible, but not selectable —
+                    // ticking it could only ever return nothing.
+                    <li
+                      key={b.id}
+                      title="No products listed yet"
+                      className="flex items-center gap-2.5 py-2 px-2 -mx-2 text-sm text-muted"
                     >
-                      <span
-                        className={cn(
-                          "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
-                          activeBrands.includes(b.id)
-                            ? "bg-slate-900 border-slate-900"
-                            : "border-border-base bg-surface"
-                        )}
-                      >
-                        {activeBrands.includes(b.id) && <Check size={12} className="text-white" />}
-                      </span>
+                      <span className="w-4 h-4 rounded border border-dashed border-border-base flex-shrink-0" />
                       <span className="flex-1 truncate">{b.name}</span>
-                      <span className="text-xs text-muted">{b.count}</span>
-                    </button>
-                  </li>
-                ))}
+                      <ComingSoonTag />
+                    </li>
+                  ) : (
+                    <li key={b.id}>
+                      <button
+                        onClick={() => toggleBrand(b.id)}
+                        className="w-full flex items-center gap-2.5 py-2 px-2 -mx-2 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
+                      >
+                        <span
+                          className={cn(
+                            "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
+                            activeBrands.includes(b.id)
+                              ? "bg-slate-900 border-slate-900"
+                              : "border-border-base bg-surface"
+                          )}
+                        >
+                          {activeBrands.includes(b.id) && <Check size={12} className="text-white" />}
+                        </span>
+                        <span className="flex-1 truncate">{b.name}</span>
+                        <span className="text-xs text-muted">{b.count}</span>
+                      </button>
+                    </li>
+                  )
+                )}
               </ul>
             </div>
           )}
@@ -175,27 +190,38 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
                 <>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Brand</h3>
                   <ul className="space-y-1">
-                    {brands.map((b) => (
-                      <li key={b.id}>
-                        <button
-                          onClick={() => toggleBrand(b.id)}
-                          className="w-full flex items-center gap-3 min-h-[48px] px-3 -mx-1 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
+                    {brands.map((b) =>
+                      b.count === 0 ? (
+                        <li
+                          key={b.id}
+                          className="flex items-center gap-3 min-h-[48px] px-3 -mx-1 text-sm text-muted"
                         >
-                          <span
-                            className={cn(
-                              "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
-                              activeBrands.includes(b.id)
-                                ? "bg-slate-900 border-slate-900"
-                                : "border-border-base bg-surface"
-                            )}
-                          >
-                            {activeBrands.includes(b.id) && <Check size={13} className="text-white" />}
-                          </span>
+                          <span className="w-5 h-5 rounded border border-dashed border-border-base flex-shrink-0" />
                           <span className="flex-1">{b.name}</span>
-                          <span className="text-xs text-muted">{b.count}</span>
-                        </button>
-                      </li>
-                    ))}
+                          <ComingSoonTag />
+                        </li>
+                      ) : (
+                        <li key={b.id}>
+                          <button
+                            onClick={() => toggleBrand(b.id)}
+                            className="w-full flex items-center gap-3 min-h-[48px] px-3 -mx-1 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
+                          >
+                            <span
+                              className={cn(
+                                "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
+                                activeBrands.includes(b.id)
+                                  ? "bg-slate-900 border-slate-900"
+                                  : "border-border-base bg-surface"
+                              )}
+                            >
+                              {activeBrands.includes(b.id) && <Check size={13} className="text-white" />}
+                            </span>
+                            <span className="flex-1">{b.name}</span>
+                            <span className="text-xs text-muted">{b.count}</span>
+                          </button>
+                        </li>
+                      )
+                    )}
                   </ul>
                   {filterCount > 0 && (
                     <button

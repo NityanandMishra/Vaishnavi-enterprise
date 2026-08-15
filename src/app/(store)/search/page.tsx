@@ -8,7 +8,7 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
-  HAS_PRODUCTS,
+
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
@@ -49,8 +49,9 @@ export default async function SearchPage({
       include: productCardInclude,
     }),
     prisma.product.count({ where }),
+    // Brands with no products are listed but flagged rather than hidden, so a
+    // brand the admin has set up is visible on the storefront straight away.
     prisma.brand.findMany({
-      where: { ...HAS_PRODUCTS },
       orderBy: { name: "asc" },
       include: { _count: { select: { products: true } } },
     }),

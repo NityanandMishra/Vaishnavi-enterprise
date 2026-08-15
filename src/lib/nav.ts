@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/db";
 
-export type NavSubcategory = { id: string; name: string; slug: string };
-export type NavCategory = NavSubcategory & { children: NavSubcategory[] };
+export type NavSubcategory = {
+  id: string;
+  name: string;
+  slug: string;
+  /** Created by the admin but not yet stocked — shown, but not navigable. */
+  comingSoon: boolean;
+};
+export type NavCategory = Omit<NavSubcategory, "comingSoon"> & {
+  children: NavSubcategory[];
+};
 
 /** How many categories may ever appear inline in the header bar. */
 export const PINNED_LIMIT = 3;
@@ -9,14 +17,18 @@ export const PINNED_LIMIT = 3;
 /**
  * Categories for the storefront header.
  *
- * A nav entry has to lead somewhere, so a top-level category qualifies only if
- * it holds products itself or has a subcategory that does — the same rule
- * already applied to subcategory chips and brand facets. Without it the menu
- * would list placeholder categories that open an empty listing.
+ * Subcategories are listed whether or not they hold products. Hiding the empty
+ * ones made the system look broken from the admin side — you create a
+ * subcategory and it simply never shows up — so an unstocked one is surfaced
+ * with a "Soon" tag and rendered inert instead of dropped.
  *
- * Note the header renders a fixed number of inline slots regardless of how many
- * categories come back: everything beyond PINNED_LIMIT lives in the mega-menu,
- * so adding categories can never grow the header.
+ * Top-level categories still have to lead somewhere: one that has no products
+ * and no stocked subcategory is left out, which keeps placeholder rows out of
+ * the primary navigation.
+ *
+ * The header renders a fixed number of inline slots regardless of what comes
+ * back — everything past PINNED_LIMIT lives in the mega-menu — so category
+ * count can never change the height of the bar.
  */
 export async function getNavCategories(): Promise<NavCategory[]> {
   const categories = await prisma.category.findMany({
@@ -33,12 +45,26 @@ export async function getNavCategories(): Promise<NavCategory[]> {
       name: true,
       slug: true,
       children: {
-        where: { products: { some: {} } },
         orderBy: { sortOrder: "asc" },
-        select: { id: true, name: true, slug: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          _count: { select: { products: true } },
+        },
       },
     },
   });
 
-  return categories;
+  return categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    children: c.children.map((s) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      comingSoon: s._count.products === 0,
+    })),
+  }));
 }

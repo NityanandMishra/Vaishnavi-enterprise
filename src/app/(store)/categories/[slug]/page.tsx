@@ -9,13 +9,13 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
-  HAS_PRODUCTS,
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import ProductCard from "@/components/store/ProductCard";
 import CatalogControls from "@/components/store/CatalogControls";
+import ComingSoonTag from "@/components/store/ComingSoonTag";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
 import EmptyState from "@/components/store/EmptyState";
 
@@ -43,10 +43,13 @@ export default async function CategoryPage({
     where: { slug: params.slug },
     include: {
       parent: true,
-      // Only subcategories that lead somewhere become filter chips. This also
-      // narrows the product scope below, harmlessly — an excluded child has no
-      // products to contribute.
-      children: { where: { ...HAS_PRODUCTS }, orderBy: { sortOrder: "asc" } },
+      // Unstocked subcategories still appear as chips, flagged and inert, so
+      // the admin can see what they created. They contribute no products to
+      // the scope below either way.
+      children: {
+        orderBy: { sortOrder: "asc" },
+        include: { _count: { select: { products: true } } },
+      },
     },
   });
 
@@ -136,20 +139,31 @@ export default async function CategoryPage({
             >
               All Items
             </Link>
-            {category.children.map((child) => (
-              <Link
-                key={child.id}
-                href={`/categories/${category.slug}?sub=${child.id}`}
-                className={cn(
-                  "flex-shrink-0 min-h-[40px] flex items-center px-4 rounded-full border text-sm font-medium transition-colors",
-                  searchParams.sub === child.id
-                    ? "bg-slate-900 border-slate-900 text-white"
-                    : "bg-surface border-border-base text-slate-900 hover:border-slate-400"
-                )}
-              >
-                {child.name}
-              </Link>
-            ))}
+            {category.children.map((child) =>
+              child._count.products === 0 ? (
+                <span
+                  key={child.id}
+                  title="No products listed yet"
+                  className="flex-shrink-0 min-h-[40px] flex items-center gap-2 px-4 rounded-full border border-dashed border-border-base bg-surface-alt text-sm font-medium text-muted cursor-default"
+                >
+                  {child.name}
+                  <ComingSoonTag />
+                </span>
+              ) : (
+                <Link
+                  key={child.id}
+                  href={`/categories/${category.slug}?sub=${child.id}`}
+                  className={cn(
+                    "flex-shrink-0 min-h-[40px] flex items-center px-4 rounded-full border text-sm font-medium transition-colors",
+                    searchParams.sub === child.id
+                      ? "bg-slate-900 border-slate-900 text-white"
+                      : "bg-surface border-border-base text-slate-900 hover:border-slate-400"
+                  )}
+                >
+                  {child.name}
+                </Link>
+              )
+            )}
           </div>
         )}
       </div>

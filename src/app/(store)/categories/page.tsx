@@ -3,7 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { ImageOff, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { HAS_PRODUCTS } from "@/lib/catalog";
+import ComingSoonTag from "@/components/store/ComingSoonTag";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
 
 export const metadata: Metadata = {
@@ -17,9 +17,12 @@ export default async function CategoriesPage() {
     orderBy: { sortOrder: "asc" },
     include: {
       image: true,
-      // Empty subcategories are hidden from shoppers — the link would only
-      // lead to an empty listing.
-      children: { where: { ...HAS_PRODUCTS }, orderBy: { sortOrder: "asc" } },
+      // Unstocked subcategories are listed but flagged, not hidden — see
+      // ComingSoonTag for why.
+      children: {
+        orderBy: { sortOrder: "asc" },
+        include: { _count: { select: { products: true } } },
+      },
       _count: { select: { products: true } },
     },
   });
@@ -62,17 +65,28 @@ export default async function CategoriesPage() {
 
             {cat.children.length > 0 && (
               <ul className="mt-4 pt-3 border-t border-border-base space-y-0.5">
-                {cat.children.map((child) => (
-                  <li key={child.id}>
-                    <Link
-                      href={`/categories/${child.slug}`}
-                      className="flex items-center justify-between min-h-[40px] px-2 -mx-2 rounded-md text-sm text-slate-600 hover:text-slate-900 hover:bg-surface-alt transition-colors"
+                {cat.children.map((child) =>
+                  child._count.products === 0 ? (
+                    <li
+                      key={child.id}
+                      className="flex items-center gap-2 min-h-[40px] px-2 -mx-2 text-sm text-muted"
+                      title="No products listed yet"
                     >
                       {child.name}
-                      <ChevronRight size={15} className="text-muted" />
-                    </Link>
-                  </li>
-                ))}
+                      <ComingSoonTag />
+                    </li>
+                  ) : (
+                    <li key={child.id}>
+                      <Link
+                        href={`/categories/${child.slug}`}
+                        className="flex items-center justify-between min-h-[40px] px-2 -mx-2 rounded-md text-sm text-slate-600 hover:text-slate-900 hover:bg-surface-alt transition-colors"
+                      >
+                        {child.name}
+                        <ChevronRight size={15} className="text-muted" />
+                      </Link>
+                    </li>
+                  )
+                )}
               </ul>
             )}
           </div>
