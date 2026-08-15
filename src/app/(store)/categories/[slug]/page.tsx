@@ -9,6 +9,7 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
+  HAS_PRODUCTS,
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
@@ -42,7 +43,10 @@ export default async function CategoryPage({
     where: { slug: params.slug },
     include: {
       parent: true,
-      children: { orderBy: { sortOrder: "asc" } },
+      // Only subcategories that lead somewhere become filter chips. This also
+      // narrows the product scope below, harmlessly — an excluded child has no
+      // products to contribute.
+      children: { where: { ...HAS_PRODUCTS }, orderBy: { sortOrder: "asc" } },
     },
   });
 
@@ -81,11 +85,15 @@ export default async function CategoryPage({
   const brandRecords = brandIds.length
     ? await prisma.brand.findMany({ where: { id: { in: brandIds } }, orderBy: { name: "asc" } })
     : [];
-  const brands = brandRecords.map((b) => ({
-    id: b.id,
-    name: b.name,
-    count: brandGroups.find((g) => g.brandId === b.id)?._count._all ?? 0,
-  }));
+  const brands = brandRecords
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      count: brandGroups.find((g) => g.brandId === b.id)?._count._all ?? 0,
+    }))
+    // The groupBy already implies at least one product, but keep the rule
+    // explicit so a brand can never render a "0" facet.
+    .filter((b) => b.count > 0);
 
   const hasMore = totalCount > products.length;
   const nextShowParams = new URLSearchParams(

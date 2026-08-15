@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { ImageOff, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { HAS_PRODUCTS } from "@/lib/catalog";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
 
 export const metadata: Metadata = {
@@ -16,7 +17,9 @@ export default async function CategoriesPage() {
     orderBy: { sortOrder: "asc" },
     include: {
       image: true,
-      children: { orderBy: { sortOrder: "asc" } },
+      // Empty subcategories are hidden from shoppers — the link would only
+      // lead to an empty listing.
+      children: { where: { ...HAS_PRODUCTS }, orderBy: { sortOrder: "asc" } },
       _count: { select: { products: true } },
     },
   });

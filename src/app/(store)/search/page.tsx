@@ -8,6 +8,7 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
+  HAS_PRODUCTS,
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
@@ -49,6 +50,7 @@ export default async function SearchPage({
     }),
     prisma.product.count({ where }),
     prisma.brand.findMany({
+      where: { ...HAS_PRODUCTS },
       orderBy: { name: "asc" },
       include: { _count: { select: { products: true } } },
     }),

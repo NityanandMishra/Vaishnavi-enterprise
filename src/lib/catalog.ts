@@ -31,6 +31,18 @@ export function toProductCardData(product: ProductWithCardData): ProductCardData
   };
 }
 
+/**
+ * Storefront visibility rule for taxonomy.
+ *
+ * Subcategories and brands are only worth showing a shopper if they lead
+ * somewhere — an empty filter chip or brand checkbox just yields "no results".
+ * Apply as a relation filter: `where: { ...HAS_PRODUCTS }`.
+ *
+ * Admin screens deliberately do not use this; an empty category still has to be
+ * manageable before anything is filed under it.
+ */
+export const HAS_PRODUCTS = { products: { some: {} } } as const;
+
 export const PAGE_SIZE = 12;
 
 export type CatalogSearchParams = {
