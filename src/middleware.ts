@@ -12,16 +12,17 @@ export async function middleware(req: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET,
     });
 
-    // Not logged in → redirect to admin login
+    // Not logged in → redirect to unified login with admin callback
     if (!token) {
-      const loginUrl = new URL("/admin/login", req.url);
+      const loginUrl = new URL("/auth/login", req.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Logged in but not an admin → redirect to homepage
-    if (token.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/", req.url));
+    // Logged in but not an admin role → redirect to customer account
+    const role = token.role as string | undefined;
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER") {
+      return NextResponse.redirect(new URL("/account", req.url));
     }
   }
 

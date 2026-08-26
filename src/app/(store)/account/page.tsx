@@ -8,6 +8,8 @@ import { authOptions } from "@/lib/nextauth";
 import { cn, formatINR } from "@/lib/utils";
 import EmptyState from "@/components/store/EmptyState";
 import SignOutButton from "@/components/store/SignOutButton";
+import AddressManager from "@/components/store/AddressManager";
+import ProfileManager from "@/components/store/ProfileManager";
 
 export const metadata: Metadata = { title: "My Account" };
 
@@ -151,74 +153,12 @@ export default async function AccountPage({
               </ul>
             ))}
 
-          {activeTab === "addresses" &&
-            (addresses.length === 0 ? (
-              <EmptyState
-                icon={MapPin}
-                title="No saved addresses"
-                description="Addresses you enter at checkout will be saved here for next time."
-                actionLabel="Browse Products"
-                actionHref="/categories"
-              />
-            ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {addresses.map((address) => (
-                  <li
-                    key={address.id}
-                    className="bg-surface border border-border-base rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-bold text-slate-900">{address.fullName}</p>
-                      {address.isDefault && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm bg-surface-sunken text-slate-700">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                      {address.addressLine1}
-                      {address.addressLine2 && `, ${address.addressLine2}`}
-                      <br />
-                      {address.city}, {address.state} — {address.pincode}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ))}
+          {activeTab === "addresses" && (
+            <AddressManager addresses={addresses} />
+          )}
 
           {activeTab === "profile" && (
-            <div className="space-y-4">
-              <div className="bg-surface border border-border-base rounded-lg p-5">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-muted mb-4">
-                  Account Details
-                </h2>
-                <dl className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <User size={18} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <dt className="text-xs text-muted">Full Name</dt>
-                      <dd className="text-sm text-slate-900">{user.name ?? "—"}</dd>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Mail size={18} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <dt className="text-xs text-muted">Email Address</dt>
-                      <dd className="text-sm text-slate-900">{user.email ?? "—"}</dd>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Phone size={18} className="text-slate-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <dt className="text-xs text-muted">Phone Number</dt>
-                      <dd className="text-sm text-slate-900">{user.phone ?? "—"}</dd>
-                    </div>
-                  </div>
-                </dl>
-              </div>
-
-              <SignOutButton />
-            </div>
+            <ProfileManager user={user} />
           )}
         </div>
       </div>

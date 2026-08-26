@@ -15,6 +15,8 @@ import SpecTable from "@/components/store/SpecTable";
 import SectionHeading from "@/components/store/SectionHeading";
 import TrustStrip from "@/components/store/TrustStrip";
 import WishlistButton from "@/components/store/WishlistButton";
+import ProductReviews from "@/components/store/ProductReviews";
+import { Star } from "lucide-react";
 
 export async function generateMetadata({
   params,
@@ -45,7 +47,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
-  const [related, wishlisted] = await Promise.all([
+  const [related, wishlisted, reviews] = await Promise.all([
     prisma.product.findMany({
       where: { categoryId: product.categoryId, id: { not: product.id }, isAvailable: true },
       take: 4,
@@ -54,6 +56,11 @@ export default async function ProductPage({ params }: { params: { id: string } }
     userId
       ? prisma.wishlistItem.findFirst({ where: { userId, productId: product.id } })
       : null,
+    prisma.review.findMany({
+      where: { productId: product.id, status: "APPROVED", deletedAt: null },
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const specs = parseSpecs(product.specs);
@@ -98,9 +105,25 @@ export default async function ProductPage({ params }: { params: { id: string } }
               {product.brand.name}
             </p>
           )}
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 leading-tight mb-3">
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 leading-tight mb-2">
             {product.title}
           </h1>
+
+          {/* Rating Summary Star Pill */}
+          {reviews.length > 0 && (
+            <div className="flex items-center gap-2 mb-3">
+              <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-amber-800 font-bold text-xs font-mono">
+                <Star size={13} className="fill-amber-400 text-amber-400" />
+                <span>
+                  {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)}
+                </span>
+              </div>
+              <span className="text-xs text-slate-500">
+                ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
+              </span>
+            </div>
+          )}
+
           <p className="text-sm text-slate-600 leading-relaxed mb-6">{product.description}</p>
 
           {isInquire ? (
@@ -146,6 +169,16 @@ export default async function ProductPage({ params }: { params: { id: string } }
           </div>
         </section>
       )}
+
+      {/* ── Product Reviews Section ──────────────────────────────────── */}
+      <section className="max-w-content mx-auto px-4 lg:px-8">
+        <ProductReviews
+          productId={product.id}
+          productTitle={product.title}
+          reviews={reviews}
+          isLoggedIn={!!userId}
+        />
+      </section>
 
       {/* ── Related products ─────────────────────────────────────────── */}
       {related.length > 0 && (

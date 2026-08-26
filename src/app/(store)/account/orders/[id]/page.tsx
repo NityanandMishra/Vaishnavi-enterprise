@@ -13,6 +13,7 @@ import {
   Truck,
   Package,
   Clock,
+  FileText,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { authOptions } from "@/lib/nextauth";
@@ -226,15 +227,21 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 <dt className="text-slate-600">Subtotal</dt>
                 <dd className="text-slate-900">{formatINR(subtotal)}</dd>
               </div>
+              {order.discountAmount > 0 && (
+                <div className="flex justify-between text-success">
+                  <dt>Coupon Discount ({order.couponCode || "APPLIED"})</dt>
+                  <dd>-{formatINR(order.discountAmount)}</dd>
+                </div>
+              )}
               <div className="flex justify-between">
-                <dt className="text-slate-600">Shipping</dt>
-                <dd className="font-medium text-success">
-                  {order.shippingCost > 0 ? formatINR(order.shippingCost) : "Free"}
-                </dd>
+                <dt className="text-slate-600">GST (18% included)</dt>
+                <dd className="text-slate-900">{formatINR(gst)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-600">Tax (GST 18%)</dt>
-                <dd className="text-slate-900">{formatINR(gst)}</dd>
+                <dt className="text-slate-600">Shipping</dt>
+                <dd className="text-slate-900">
+                  {order.shippingCost === 0 ? "Free" : formatINR(order.shippingCost)}
+                </dd>
               </div>
               <div className="flex justify-between pt-2 border-t border-border-base">
                 <dt className="text-base font-bold text-slate-900">Order Total</dt>
@@ -243,6 +250,17 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 </dd>
               </div>
             </dl>
+
+            {/* Download Tax Invoice CTA */}
+            <div className="mt-4 pt-4 border-t border-border-base">
+              <Link
+                href={`/account/orders/${order.id}/invoice`}
+                className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-md border border-slate-900 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors"
+              >
+                <FileText size={16} />
+                <span>Download / Print GST Invoice</span>
+              </Link>
+            </div>
           </div>
         </div>
 

@@ -68,15 +68,17 @@ model User {
   image         String?   // Required by NextAuth standard Adapter
   phone         String?   @unique
   passwordHash  String?
-  role          String    @default("CUSTOMER") // "CUSTOMER" | "ADMIN"
+  role          String    @default("CUSTOMER") // "CUSTOMER" | "ADMIN" | "SUPER_ADMIN" | "CATALOG_MANAGER" | "OPS_EXECUTIVE" | "FINANCE"
   name          String?
   phoneVerified Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   addresses     Address[]
   orders        Order[]
   wishlistItems WishlistItem[]
+  reviews       Review[]
   accounts      Account[]
   sessions      Session[]
   carts         Cart[]
@@ -120,13 +122,14 @@ model MediaImage {
 // ─── BRAND ───────────────────────────────────────────────────────────────────
 
 model Brand {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  slug        String   @unique
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
   description String?
-  logoId      String?  // References MediaImage
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  logoId      String?   // References MediaImage
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   logo     MediaImage? @relation(fields: [logoId], references: [id])
   products Product[]
@@ -136,16 +139,19 @@ model Brand {
 // defaultCheckoutMode values: "BUY" | "INQUIRE"
 
 model Category {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   name                String
-  slug                String   @unique
+  slug                String    @unique
   description         String?
-  imageId             String?  // References MediaImage for category banner
-  defaultCheckoutMode String   @default("BUY") // "BUY" | "INQUIRE"
-  sortOrder           Int      @default(0)
-  parentId            String?  // null = top-level; populated = sub-category
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  imageId             String?   // References MediaImage for category banner
+  defaultCheckoutMode String    @default("BUY") // "BUY" | "INQUIRE"
+  hsnCode             String?   // Default HSN code for products in this category
+  gstRate             Float?    @default(18.0) // Default GST % (e.g. 18.0)
+  sortOrder           Int       @default(0)
+  parentId            String?   // null = top-level; populated = sub-category
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   image    MediaImage? @relation(fields: [imageId], references: [id])
   parent   Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
@@ -161,24 +167,29 @@ model Category {
 // stockMode values: "TRACKED" | "VIRTUAL" | "INQUIRE"
 
 model Product {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   title        String
   description  String
   basePrice    Float
-  checkoutMode String   // "BUY" | "INQUIRE"
-  stockMode    String   // "TRACKED" | "VIRTUAL" | "INQUIRE"
-  isAvailable  Boolean  @default(true)
+  checkoutMode String    // "BUY" | "INQUIRE"
+  stockMode    String    // "TRACKED" | "VIRTUAL" | "INQUIRE"
+  isAvailable  Boolean   @default(true)
   categoryId   String
   brandId      String?
-  specs        String   @default("{}") // SQLite: stored as JSON string
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sellerId     String?   // House seller record default, future multi-vendor (D-02)
+  hsnCode      String?   // Overrides Category HSN code (D-06)
+  gstRate      Float?    // Overrides Category GST % (D-06)
+  specs        String    @default("{}") // SQLite: stored as JSON string
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   category   Category       @relation(fields: [categoryId], references: [id])
   brand      Brand?         @relation(fields: [brandId], references: [id])
   images     ProductImage[]
   variants   ProductVariant[]
   wishlist   WishlistItem[]
+  reviews    Review[]
   leads      Lead[]
   orderItems OrderItem[]
   cartItems  CartItem[]
@@ -202,15 +213,16 @@ model ProductImage {
 // ─── PRODUCT VARIANT ─────────────────────────────────────────────────────────
 
 model ProductVariant {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   productId   String
-  title       String   // e.g. "1200mm Brown", "2.5mm Black 90M", "50W Cool White"
-  price       Float?   // null = inherits product basePrice
-  stock       Int      @default(0) // Active only when Product.stockMode = "TRACKED"
-  sku         String?  @unique
+  title       String    // e.g. "1200mm Brown", "2.5mm Black 90M", "50W Cool White"
+  price       Float?    // null = inherits product basePrice
+  stock       Int       @default(0) // Active only when Product.stockMode = "TRACKED"
+  sku         String?   @unique
   color       String?
   size        String?
-  isAvailable Boolean  @default(true)
+  isAvailable Boolean   @default(true)
+  deletedAt   DateTime?
 
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems  CartItem[]
@@ -248,21 +260,25 @@ model CartItem {
 // status values: "PENDING" | "CAPTURED" | "COD_CONFIRMED" | "FULFILLED" | "DELIVERED" | "CANCELLED" | "REFUNDED"
 
 model Order {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   userId            String
-  status            String   @default("PENDING")
+  status            String    @default("PENDING")
   totalAmount       Float
-  paymentMethod     String   // "RAZORPAY" | "COD"
-  razorpayOrderId   String?  @unique
-  razorpayPaymentId String?  @unique
-  shiprocketOrderId String?  @unique
-  shippingCost      Float    @default(0)
-  deliveryZone      String   // "LOCAL" | "UP" | "PAN_INDIA"
+  discountAmount    Float     @default(0)
+  couponCode        String?
+  paymentMethod     String    // "RAZORPAY" | "COD"
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?   @unique
+  shiprocketOrderId String?   @unique
+  shippingCost      Float     @default(0)
+  deliveryZone      String    // "LOCAL" | "UP" | "PAN_INDIA"
   trackingNumber    String?
   trackingUrl       String?
-  shippingAddress   String   // SQLite: JSON string snapshot of address
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  shippingAddress   String    // SQLite: JSON string snapshot of address
+  sellerId          String?   // House seller record default (D-02)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]
@@ -284,6 +300,65 @@ model OrderItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 }
 
+// ─── COUPON ──────────────────────────────────────────────────────────────────
+
+model Coupon {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  discountType  String    // "PERCENTAGE" | "FLAT"
+  discountValue Float     // e.g. 10 (%) or 500 (₹)
+  minOrderValue Float     @default(0)
+  maxDiscount   Float?    // Cap for percentage discounts (e.g. max ₹1,000)
+  usageLimit    Int?      // Null = unlimited
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+}
+
+// ─── REVIEW ──────────────────────────────────────────────────────────────────
+
+model Review {
+  id                 String    @id @default(uuid())
+  userId             String
+  productId          String
+  rating             Int       // 1 to 5
+  title              String?
+  comment            String
+  isVerifiedPurchase Boolean   @default(false)
+  status             String    @default("APPROVED") // "APPROVED" | "PENDING" | "REJECTED"
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([userId])
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String
+  actorName   String
+  actorRole   String
+  entity      String   // e.g. "PRODUCT", "ORDER", "COUPON", "INVENTORY"
+  entityId    String
+  action      String   // e.g. "UPDATE_PRICE", "ADJUST_STOCK", "CREATE_COUPON"
+  beforeState String?  // JSON string snapshot
+  afterState  String?  // JSON string snapshot
+  ipAddress   String?
+  timestamp   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+}
+
 // ─── LEAD ────────────────────────────────────────────────────────────────────
 // status values: "NEW" | "CONTACTED" | "QUOTED" | "CLOSED_WON" | "CLOSED_LOST"
 
@@ -303,6 +378,7 @@ model Lead {
   sourceUrl    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   product Product? @relation(fields: [productId], references: [id])
 }
@@ -321,3 +397,4 @@ model WishlistItem {
 
   @@unique([userId, productId, variantId])
 }
+

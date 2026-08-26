@@ -2,9 +2,21 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { Lock, AlertCircle, ImageOff, Smartphone, CreditCard, Landmark, Banknote } from "lucide-react";
+import {
+  Lock,
+  AlertCircle,
+  ImageOff,
+  Smartphone,
+  CreditCard,
+  Landmark,
+  Banknote,
+  Tag,
+  CheckCircle2,
+  X,
+  Loader2,
+} from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
-import { placeOrder } from "@/app/(store)/actions";
+import { placeOrder, validateCoupon } from "@/app/(store)/actions";
 
 type SummaryLine = {
   id: string;
@@ -30,8 +42,8 @@ const SHIPPING_METHODS = [
 export default function CheckoutForm({
   lines,
   subtotal,
-  gst,
-  total,
+  gst: initialGst,
+  total: initialTotal,
   defaultName,
 }: {
   lines: SummaryLine[];
@@ -45,12 +57,61 @@ export default function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Coupon State
+  const [couponCode, setCouponCode] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+    message: string;
+  } | null>(null);
+
+  async function handleApplyCoupon(e: React.FormEvent) {
+    e.preventDefault();
+    if (!couponCode.trim()) return;
+    setCouponError(null);
+    setCouponLoading(true);
+
+    try {
+      const res = await validateCoupon(couponCode, subtotal);
+      if (res.ok) {
+        setAppliedCoupon({
+          code: res.code,
+          discount: res.discount,
+          message: res.message,
+        });
+        setCouponCode("");
+      } else {
+        setCouponError(res.error);
+      }
+    } catch (_) {
+      setCouponError("Failed to validate coupon code.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  }
+
+  // Dynamic calculations
+  const discountAmount = appliedCoupon ? appliedCoupon.discount : 0;
+  const taxableSubtotal = Math.max(0, subtotal - discountAmount);
+  const dynamicGst = Math.round(taxableSubtotal * 0.18);
+  const dynamicTotal = taxableSubtotal + dynamicGst;
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const formData = new FormData(e.currentTarget);
     // Card and netbanking both settle through Razorpay.
     formData.set("paymentMethod", payment === "COD" ? "COD" : "RAZORPAY");
+    if (appliedCoupon) {
+      formData.set("couponCode", appliedCoupon.code);
+    }
 
     startTransition(async () => {
       const response = await placeOrder(null, formData);
@@ -89,18 +150,78 @@ export default function CheckoutForm({
         ))}
       </ul>
 
+      {/* Coupon Code Section */}
+      <div className="pt-4 border-t border-border-base mb-4">
+        {appliedCoupon ? (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-emerald-800 font-medium">
+              <Tag size={15} className="text-emerald-600" />
+              <div>
+                <span className="font-bold font-mono uppercase">{appliedCoupon.code}</span>
+                <span className="text-[11px] block text-emerald-700">{appliedCoupon.message}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveCoupon}
+              aria-label="Remove coupon"
+              className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleApplyCoupon} className="space-y-2">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Tag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCouponError(null);
+                  }}
+                  placeholder="Coupon code (e.g. WELCOME10)"
+                  className="w-full h-10 pl-9 pr-3 uppercase font-mono text-xs border border-border-base rounded-md focus:outline-none focus:ring-1 focus:ring-brand-orange-600"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={couponLoading || !couponCode.trim()}
+                className="h-10 px-4 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {couponLoading && <Loader2 size={13} className="animate-spin" />}
+                <span>Apply</span>
+              </button>
+            </div>
+            {couponError && (
+              <p className="text-xs text-danger font-medium flex items-center gap-1">
+                <AlertCircle size={13} /> {couponError}
+              </p>
+            )}
+          </form>
+        )}
+      </div>
+
       <dl className="space-y-2 text-sm pt-4 border-t border-border-base">
         <div className="flex justify-between">
           <dt className="text-slate-600">Subtotal</dt>
           <dd className="text-slate-900">{formatINR(subtotal)}</dd>
         </div>
+        {appliedCoupon && (
+          <div className="flex justify-between text-emerald-700 font-medium">
+            <dt>Coupon Discount ({appliedCoupon.code})</dt>
+            <dd>-{formatINR(discountAmount)}</dd>
+          </div>
+        )}
         <div className="flex justify-between">
           <dt className="text-slate-600">GST (18%)</dt>
-          <dd className="text-slate-900">{formatINR(gst)}</dd>
+          <dd className="text-slate-900">{formatINR(dynamicGst)}</dd>
         </div>
         <div className="flex justify-between pt-2 border-t border-border-base">
           <dt className="text-base font-bold text-slate-900">Total Amount</dt>
-          <dd className="text-base font-bold text-slate-900">{formatINR(total)}</dd>
+          <dd className="text-base font-bold text-slate-900">{formatINR(dynamicTotal)}</dd>
         </div>
       </dl>
     </div>
@@ -224,7 +345,7 @@ export default function CheckoutForm({
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 bg-surface border-t border-border-base shadow-lg px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-bold text-slate-900">Total Amount</span>
-          <span className="text-base font-bold text-slate-900">{formatINR(total)}</span>
+          <span className="text-base font-bold text-slate-900">{formatINR(dynamicTotal)}</span>
         </div>
         {placeOrderButton}
       </div>

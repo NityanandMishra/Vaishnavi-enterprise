@@ -287,6 +287,60 @@ export async function checkPincode(pincode: string) {
   return { ok: true as const, deliverable: true, etaDays: "2–5 business days" };
 }
 
+// ─── COUPON VALIDATION ────────────────────────────────────────────────────────
+
+export async function validateCoupon(code: string, subtotal: number) {
+  if (!code || !code.trim()) {
+    return { ok: false as const, error: "Please enter a coupon code." };
+  }
+
+  const cleanCode = code.trim().toUpperCase();
+  const coupon = await prisma.coupon.findUnique({
+    where: { code: cleanCode },
+  });
+
+  if (!coupon || !coupon.isActive || coupon.deletedAt) {
+    return { ok: false as const, error: `Coupon code "${cleanCode}" is invalid or expired.` };
+  }
+
+  if (coupon.expiresAt && new Date() > new Date(coupon.expiresAt)) {
+    return { ok: false as const, error: `Coupon code "${cleanCode}" has expired.` };
+  }
+
+  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+    return { ok: false as const, error: `Coupon code "${cleanCode}" usage limit has been reached.` };
+  }
+
+  if (subtotal < coupon.minOrderValue) {
+    return {
+      ok: false as const,
+      error: `Minimum order value for ${cleanCode} is ₹${coupon.minOrderValue.toLocaleString("en-IN")}.`,
+    };
+  }
+
+  let discount = 0;
+  if (coupon.discountType === "PERCENTAGE") {
+    discount = Math.round((subtotal * coupon.discountValue) / 100);
+    if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+      discount = coupon.maxDiscount;
+    }
+  } else {
+    discount = Math.min(coupon.discountValue, subtotal);
+  }
+
+  return {
+    ok: true as const,
+    code: coupon.code,
+    discount,
+    discountType: coupon.discountType,
+    discountValue: coupon.discountValue,
+    message:
+      coupon.discountType === "PERCENTAGE"
+        ? `${coupon.discountValue}% off applied! (Saved ₹${discount.toLocaleString("en-IN")})`
+        : `Flat ₹${discount.toLocaleString("en-IN")} discount applied!`,
+  };
+}
+
 const placeOrderSchema = z.object({
   fullName: z.string().trim().min(2).max(80),
   phone: z.string().trim().regex(/^(\+91[\s-]?)?[6-9]\d{9}$/, "Enter a valid mobile number."),
@@ -296,6 +350,7 @@ const placeOrderSchema = z.object({
   state: z.string().trim().min(2).max(80),
   pincode: z.string().trim().regex(/^\d{6}$/, "Enter a valid 6-digit pincode."),
   paymentMethod: z.enum(["RAZORPAY", "COD"]),
+  couponCode: z.string().trim().optional().or(z.literal("")),
 });
 
 export async function placeOrder(_prev: unknown, formData: FormData) {
@@ -311,6 +366,7 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     state: formData.get("state"),
     pincode: formData.get("pincode"),
     paymentMethod: formData.get("paymentMethod"),
+    couponCode: formData.get("couponCode") ?? "",
   });
 
   if (!parsed.success) {
@@ -330,14 +386,32 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     price: lineItemPrice(item.product.basePrice, item.variant?.price),
   }));
 
-  const { total } = cartTotals(lines);
+  const { subtotal } = cartTotals(lines);
+
+  // Validate discount if coupon provided
+  let discountAmount = 0;
+  let appliedCouponCode: string | null = null;
+
+  if (parsed.data.couponCode) {
+    const couponValidation = await validateCoupon(parsed.data.couponCode, subtotal);
+    if (couponValidation.ok) {
+      discountAmount = couponValidation.discount;
+      appliedCouponCode = couponValidation.code;
+    }
+  }
+
+  const finalSubtotal = Math.max(0, subtotal - discountAmount);
+  const gst = Math.round(finalSubtotal * 0.18);
+  const finalTotal = finalSubtotal + gst;
 
   // Razorpay capture happens here once the gateway is wired up.
   const order = await prisma.order.create({
     data: {
       userId,
       status: parsed.data.paymentMethod === "COD" ? "COD_CONFIRMED" : "PENDING",
-      totalAmount: total,
+      totalAmount: finalTotal,
+      discountAmount,
+      couponCode: appliedCouponCode,
       paymentMethod: parsed.data.paymentMethod,
       deliveryZone: parsed.data.state.toLowerCase().includes("uttar pradesh") ? "UP" : "PAN_INDIA",
       shippingAddress: JSON.stringify(parsed.data),
@@ -345,9 +419,204 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     },
   });
 
+  // Increment coupon usage count if applied
+  if (appliedCouponCode) {
+    await prisma.coupon.update({
+      where: { code: appliedCouponCode },
+      data: { usedCount: { increment: 1 } },
+    });
+  }
+
+  // Also auto-save address to user's address book if not already saved
+  const existingAddress = await prisma.address.findFirst({
+    where: {
+      userId,
+      addressLine1: parsed.data.addressLine1,
+      pincode: parsed.data.pincode,
+    },
+  });
+  if (!existingAddress) {
+    await prisma.address.create({
+      data: {
+        userId,
+        fullName: parsed.data.fullName,
+        addressLine1: parsed.data.addressLine1,
+        addressLine2: parsed.data.addressLine2 || null,
+        city: parsed.data.city,
+        state: parsed.data.state,
+        pincode: parsed.data.pincode,
+        alternatePhone: parsed.data.phone,
+        isDefault: false,
+      },
+    });
+  }
+
   await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
   revalidatePath("/cart");
   revalidatePath("/account");
   redirect(`/account/orders/${order.id}`);
 }
+
+// ─── ADDRESS MANAGEMENT ACTIONS ──────────────────────────────────────────────
+
+export async function saveAddress(_prev: unknown, formData: FormData) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Please sign in to save addresses." };
+
+  const id = formData.get("id") as string | null;
+  const fullName = (formData.get("fullName") as string)?.trim();
+  const addressLine1 = (formData.get("addressLine1") as string)?.trim();
+  const addressLine2 = (formData.get("addressLine2") as string)?.trim() || null;
+  const city = (formData.get("city") as string)?.trim();
+  const state = (formData.get("state") as string)?.trim();
+  const pincode = (formData.get("pincode") as string)?.trim();
+  const alternatePhone = (formData.get("alternatePhone") as string)?.trim() || null;
+  const isDefault = formData.get("isDefault") === "true";
+
+  if (!fullName || !addressLine1 || !city || !state || !pincode) {
+    return { ok: false as const, error: "Please fill in all required address fields." };
+  }
+
+  if (!/^\d{6}$/.test(pincode)) {
+    return { ok: false as const, error: "Please enter a valid 6-digit pincode." };
+  }
+
+  if (isDefault) {
+    await prisma.address.updateMany({
+      where: { userId },
+      data: { isDefault: false },
+    });
+  }
+
+  if (id) {
+    await prisma.address.update({
+      where: { id, userId },
+      data: {
+        fullName,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        pincode,
+        alternatePhone,
+        isDefault,
+      },
+    });
+  } else {
+    await prisma.address.create({
+      data: {
+        userId,
+        fullName,
+        addressLine1,
+        addressLine2,
+        city,
+        state,
+        pincode,
+        alternatePhone,
+        isDefault,
+      },
+    });
+  }
+
+  revalidatePath("/account");
+  return { ok: true as const };
+}
+
+export async function deleteAddress(addressId: string) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Unauthorized" };
+
+  await prisma.address.delete({
+    where: { id: addressId, userId },
+  });
+
+  revalidatePath("/account");
+  return { ok: true as const };
+}
+
+export async function setDefaultAddress(addressId: string) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Unauthorized" };
+
+  await prisma.address.updateMany({
+    where: { userId },
+    data: { isDefault: false },
+  });
+
+  await prisma.address.update({
+    where: { id: addressId, userId },
+    data: { isDefault: true },
+  });
+
+  revalidatePath("/account");
+  return { ok: true as const };
+}
+
+// ─── PROFILE UPDATE ACTION ───────────────────────────────────────────────────
+
+export async function updateProfile(_prev: unknown, formData: FormData) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Unauthorized" };
+
+  const name = (formData.get("name") as string)?.trim();
+  const phone = (formData.get("phone") as string)?.trim();
+
+  if (!name) {
+    return { ok: false as const, error: "Name cannot be blank." };
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      name,
+      phone: phone || null,
+    },
+  });
+
+  revalidatePath("/account");
+  return { ok: true as const };
+}
+
+// ─── REVIEWS SUBMISSION ACTION ───────────────────────────────────────────────
+
+export async function submitProductReview(_prev: unknown, formData: FormData) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Please sign in to write a review." };
+
+  const productId = formData.get("productId") as string;
+  const rating = Number(formData.get("rating"));
+  const title = (formData.get("title") as string)?.trim() || null;
+  const comment = (formData.get("comment") as string)?.trim();
+
+  if (!productId || !comment || isNaN(rating) || rating < 1 || rating > 5) {
+    return { ok: false as const, error: "Please provide a valid rating (1–5) and review comment." };
+  }
+
+  // Check if user has purchased this product before to award Verified Buyer badge
+  const verifiedOrder = await prisma.order.findFirst({
+    where: {
+      userId,
+      status: { in: ["CAPTURED", "COD_CONFIRMED", "FULFILLED", "DELIVERED"] },
+      items: {
+        some: { productId },
+      },
+    },
+  });
+
+  const review = await prisma.review.create({
+    data: {
+      userId,
+      productId,
+      rating,
+      title,
+      comment,
+      isVerifiedPurchase: !!verifiedOrder,
+      status: "APPROVED",
+    },
+  });
+
+  revalidatePath(`/products/${productId}`);
+  return { ok: true as const, reviewId: review.id };
+}
+

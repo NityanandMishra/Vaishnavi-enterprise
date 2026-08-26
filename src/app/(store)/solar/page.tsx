@@ -3,11 +3,12 @@ import Link from "next/link";
 import { Sun, Lightbulb, ClipboardList, FileText, Wrench, HeadphonesIcon, ShieldCheck, MapPin } from "lucide-react";
 import SolarInquiryForm from "@/components/store/SolarInquiryForm";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
+import SolarCalculator from "@/components/store/SolarCalculator";
 
 export const metadata: Metadata = {
-  title: "Solar Solutions",
+  title: "Solar Solutions & PM Surya Ghar Calculator",
   description:
-    "Rooftop solar for homes and housing societies, plus solar street and outdoor lighting. Free site assessment across Bhadohi and eastern Uttar Pradesh.",
+    "Calculate PM Surya Ghar Muft Bijli Yojana rooftop solar subsidy, electricity bill savings, and book free site survey in Suriyawan, Bhadohi and Eastern UP.",
 };
 
 /**
@@ -181,6 +182,11 @@ export default function SolarPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Solar Sizing Calculator Section ────────────────────────────── */}
+        <section className="py-12 lg:py-16">
+          <SolarCalculator />
+        </section>
       </div>
     </>
   );

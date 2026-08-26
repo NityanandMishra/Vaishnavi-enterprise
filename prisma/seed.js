@@ -311,6 +311,68 @@ async function main() {
   });
 
   console.log("Seeded sample Leads.");
+
+  // 8. Seed Coupons
+  await prisma.coupon.deleteMany();
+  await prisma.coupon.createMany({
+    data: [
+      {
+        code: "WELCOME10",
+        discountType: "PERCENTAGE",
+        discountValue: 10,
+        minOrderValue: 999,
+        maxDiscount: 500,
+        usageLimit: 1000,
+        usedCount: 14,
+        isActive: true,
+      },
+      {
+        code: "SOLAR500",
+        discountType: "FLAT",
+        discountValue: 500,
+        minOrderValue: 5000,
+        usageLimit: 200,
+        usedCount: 5,
+        isActive: true,
+      },
+      {
+        code: "FESTIVE15",
+        discountType: "PERCENTAGE",
+        discountValue: 15,
+        minOrderValue: 2000,
+        maxDiscount: 1500,
+        isActive: true,
+      },
+    ],
+  });
+  console.log("Seeded Coupons.");
+
+  // 9. Seed Reviews
+  await prisma.review.deleteMany();
+  await prisma.review.create({
+    data: {
+      userId: customer.id,
+      productId: productFan.id,
+      rating: 5,
+      title: "Excellent BLDC Fan - saves so much power!",
+      comment: "Installed this Atomberg fan in our living room in Suriyawan. Works flawlessly on inverter and runs dead silent with great airflow.",
+      isVerifiedPurchase: true,
+      status: "APPROVED",
+    },
+  });
+  await prisma.review.create({
+    data: {
+      userId: customer.id,
+      productId: productLED.id,
+      rating: 5,
+      title: "Bright and durable Syska panel",
+      comment: "Very bright daylight output, fits perfectly into the false ceiling cutouts. Fast local delivery.",
+      isVerifiedPurchase: true,
+      status: "APPROVED",
+    },
+  });
+  console.log("Seeded Reviews.");
+
   console.log("Database seeding completed successfully!");
 }
 
