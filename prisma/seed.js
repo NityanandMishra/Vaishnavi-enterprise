@@ -7,6 +7,11 @@ async function main() {
   console.log("Starting database seeding...");
 
   // 1. Clean existing records (in reverse dependency order)
+  await prisma.variantAttributeValue.deleteMany();
+  await prisma.productAttributeValue.deleteMany();
+  await prisma.categoryAttribute.deleteMany();
+  await prisma.attributeValue.deleteMany();
+  await prisma.attribute.deleteMany();
   await prisma.wishlistItem.deleteMany();
   await prisma.lead.deleteMany();
   await prisma.orderItem.deleteMany();
@@ -130,6 +135,120 @@ async function main() {
   });
 
   console.log("Seeded Confirmed Categories.");
+
+  // 5b. Seed Attributes & Attribute Values (EPIC-01: ATTR)
+  const attrColour = await prisma.attribute.create({
+    data: {
+      name: "Colour",
+      code: "colour",
+      inputType: "SINGLE_SELECT",
+      isVariantDefining: true,
+      usesSwatches: true,
+      description: "Outer finish or shade for appliances, fans, and wiring insulation",
+      values: {
+        create: [
+          { label: "Smoked Brown", code: "smoked_brown", swatchHex: "#5C4033", displayOrder: 1 },
+          { label: "Pearl White", code: "pearl_white", swatchHex: "#F8F9FA", displayOrder: 2 },
+          { label: "Matte Black", code: "matte_black", swatchHex: "#1A1A1A", displayOrder: 3 },
+          { label: "Midnight Blue", code: "midnight_blue", swatchHex: "#191970", displayOrder: 4 },
+          { label: "Cherry Red", code: "cherry_red", swatchHex: "#C2185B", displayOrder: 5 },
+        ],
+      },
+    },
+  });
+
+  const attrSweep = await prisma.attribute.create({
+    data: {
+      name: "Blade Sweep",
+      code: "blade_sweep",
+      inputType: "SINGLE_SELECT",
+      isVariantDefining: true,
+      usesSwatches: false,
+      description: "Blade diameter span for ceiling and exhaust fans",
+      values: {
+        create: [
+          { label: "900 mm", code: "900mm", displayOrder: 1 },
+          { label: "1200 mm", code: "1200mm", displayOrder: 2 },
+          { label: "1400 mm", code: "1400mm", displayOrder: 3 },
+        ],
+      },
+    },
+  });
+
+  const attrWireGauge = await prisma.attribute.create({
+    data: {
+      name: "Wire Gauge",
+      code: "wire_gauge",
+      inputType: "SINGLE_SELECT",
+      isVariantDefining: true,
+      usesSwatches: false,
+      description: "Cross-sectional conductor thickness in sq mm",
+      values: {
+        create: [
+          { label: "1.0 sq mm", code: "1_0_sqmm", displayOrder: 1 },
+          { label: "1.5 sq mm", code: "1_5_sqmm", displayOrder: 2 },
+          { label: "2.5 sq mm", code: "2_5_sqmm", displayOrder: 3 },
+          { label: "4.0 sq mm", code: "4_0_sqmm", displayOrder: 4 },
+        ],
+      },
+    },
+  });
+
+  const attrCapacity = await prisma.attribute.create({
+    data: {
+      name: "Power Capacity",
+      code: "power_capacity",
+      inputType: "SINGLE_SELECT",
+      isVariantDefining: true,
+      usesSwatches: false,
+      description: "Rated peak power output in kVA or kW",
+      values: {
+        create: [
+          { label: "1 kVA", code: "1kva", displayOrder: 1 },
+          { label: "3 kVA", code: "3kva", displayOrder: 2 },
+          { label: "5 kVA", code: "5kva", displayOrder: 3 },
+          { label: "10 kVA", code: "10kva", displayOrder: 4 },
+        ],
+      },
+    },
+  });
+
+  const attrWattage = await prisma.attribute.create({
+    data: {
+      name: "Rated Wattage",
+      code: "rated_wattage",
+      inputType: "NUMBER",
+      isVariantDefining: false,
+      description: "Power consumption in Watts",
+    },
+  });
+
+  // Attach attributes to categories
+  // Fans: Colour (Req), Blade Sweep (Req), Rated Wattage (Opt)
+  await prisma.categoryAttribute.createMany({
+    data: [
+      { categoryId: catFans.id, attributeId: attrColour.id, isRequired: true, displayOrder: 1 },
+      { categoryId: catFans.id, attributeId: attrSweep.id, isRequired: true, displayOrder: 2 },
+      { categoryId: catFans.id, attributeId: attrWattage.id, isRequired: false, displayOrder: 3 },
+    ],
+  });
+
+  // Electrical Wires: Wire Gauge (Req), Colour (Req)
+  await prisma.categoryAttribute.createMany({
+    data: [
+      { categoryId: catElectricalWires.id, attributeId: attrWireGauge.id, isRequired: true, displayOrder: 1 },
+      { categoryId: catElectricalWires.id, attributeId: attrColour.id, isRequired: true, displayOrder: 2 },
+    ],
+  });
+
+  // UPS Systems: Power Capacity (Req)
+  await prisma.categoryAttribute.createMany({
+    data: [
+      { categoryId: catUPSSystems.id, attributeId: attrCapacity.id, isRequired: true, displayOrder: 1 },
+    ],
+  });
+
+  console.log("Seeded Attributes, Values, and Category Linkages.");
 
   // 6. Seed Products
 

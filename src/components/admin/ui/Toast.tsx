@@ -22,18 +22,35 @@ interface ToastContextValue {
   info: (title: string, message?: string) => void;
 }
 
+type ToastEvent = {
+  type: ToastType;
+  title: string;
+  message?: string;
+  undoAction?: () => void;
+  duration?: number;
+};
+
+const listeners: Array<(event: ToastEvent) => void> = [];
+
+export const toast = {
+  success: (title: string, message?: string, undoAction?: () => void) => {
+    listeners.forEach((fn) => fn({ type: "success", title, message, undoAction }));
+  },
+  error: (title: string, message?: string) => {
+    listeners.forEach((fn) => fn({ type: "error", title, message }));
+  },
+  info: (title: string, message?: string) => {
+    listeners.forEach((fn) => fn({ type: "info", title, message }));
+  },
+};
+
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {
     // Fallback if rendered outside provider
-    return {
-      showToast: () => {},
-      success: () => {},
-      error: () => {},
-      info: () => {},
-    };
+    return toast;
   }
   return ctx;
 }
@@ -58,6 +75,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     },
     []
   );
+
+  useEffect(() => {
+    const handler = (event: ToastEvent) => {
+      showToast(event);
+    };
+    listeners.push(handler);
+    return () => {
+      const idx = listeners.indexOf(handler);
+      if (idx !== -1) listeners.splice(idx, 1);
+    };
+  }, [showToast]);
 
   const success = useCallback(
     (title: string, message?: string, undoAction?: () => void) => {

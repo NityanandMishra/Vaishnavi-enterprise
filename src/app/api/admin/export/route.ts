@@ -157,6 +157,40 @@ export async function GET(req: NextRequest) {
       l.message || "",
     ].map(escapeCSV).join(","));
 
+  } else if (type === "attributes") {
+    const attributes = await prisma.attribute.findMany({
+      where: { deletedAt: null },
+      include: {
+        values: { where: { deletedAt: null }, orderBy: { displayOrder: "asc" } },
+        categoryAttributes: { include: { category: true } },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const headers = [
+      "Attribute ID",
+      "Name",
+      "Code",
+      "Input Type",
+      "Variant Defining",
+      "Values Count",
+      "Values",
+      "Attached Categories",
+      "Active Status",
+    ];
+
+    const rows = attributes.map((a) => [
+      a.id,
+      a.name,
+      a.code,
+      a.inputType,
+      a.isVariantDefining ? "YES" : "NO",
+      a.values.length,
+      a.values.map((v) => v.label).join(" | "),
+      a.categoryAttributes.map((ca) => ca.category.name).join(" | "),
+      a.isActive ? "ACTIVE" : "INACTIVE",
+    ].map(escapeCSV).join(","));
+
     csvContent = [headers.join(","), ...rows].join("\n");
   } else {
     const products = await prisma.product.findMany({

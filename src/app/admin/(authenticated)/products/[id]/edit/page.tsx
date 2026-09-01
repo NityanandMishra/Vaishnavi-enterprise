@@ -19,6 +19,12 @@ import {
   Star,
 } from "lucide-react";
 
+import VariantMatrixBuilder, {
+  VariantMatrixItem,
+} from "@/components/admin/products/VariantMatrixBuilder";
+import { cn } from "@/lib/utils";
+import { productInputSchema, formatZodErrors } from "@/lib/validations/product";
+
 interface Category {
   id: string;
   name: string;
@@ -39,17 +45,6 @@ interface MediaImage {
 interface SpecRow {
   key: string;
   value: string;
-}
-
-interface VariantRow {
-  id?: string;
-  title: string;
-  sku: string;
-  price: string;
-  stock: number;
-  color: string;
-  size: string;
-  isAvailable: boolean;
 }
 
 interface SelectedImage {
@@ -86,12 +81,14 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
   const [showImagePicker, setShowImagePicker] = useState(false);
 
-  // Variants
-  const [variants, setVariants] = useState<VariantRow[]>([]);
+  // Variant Matrix & Single SKU
+  const [matrixVariants, setMatrixVariants] = useState<VariantMatrixItem[]>([]);
+  const [singleSku, setSingleSku] = useState("");
 
   // Feedback states
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchInitialData();
@@ -152,17 +149,31 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       setSelectedImages(prodImages);
 
       // Parse Variants
-      const prodVariants: VariantRow[] = p.variants.map((v) => ({
+      const prodVariants: VariantMatrixItem[] = p.variants.map((v: any) => ({
         id: v.id,
+        tempId: v.id,
         title: v.title,
         sku: v.sku || "",
-        price: v.price ? v.price.toString() : "",
+        price: v.price ? Number(v.price) : Number(p.basePrice),
+        mrp: v.mrp ? Number(v.mrp) : null,
         stock: v.stock,
-        color: v.color || "",
-        size: v.size || "",
-        isAvailable: v.isAvailable,
+        isActive: v.isActive !== false,
+        isExisting: true,
+        combination:
+          v.attributeValues?.map((av: any) => ({
+            attributeId: av.attributeId,
+            attributeName: av.attribute?.name || "",
+            attributeValueId: av.attributeValueId,
+            label: av.attributeValue?.label || "",
+            code: av.attributeValue?.code || "",
+            swatchHex: av.attributeValue?.swatchHex || null,
+          })) || [],
       }));
-      setVariants(prodVariants);
+      setMatrixVariants(prodVariants);
+
+      if (prodVariants.length === 1 && prodVariants[0].combination.length === 0) {
+        setSingleSku(prodVariants[0].sku || "");
+      }
     } else {
       setError(prodRes.error || "Failed to load product details");
     }
@@ -197,6 +208,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       };
       setSelectedImages([...selectedImages, newImg]);
     }
+    if (fieldErrors.images) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.images;
+        return next;
+      });
+    }
   };
 
   const handleSetMainImage = (imageId: string) => {
@@ -208,42 +226,30 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     );
   };
 
-  const handleAddVariant = () => {
-    setVariants([
-      ...variants,
-      {
-        title: "",
-        sku: "",
-        price: "",
-        stock: 10,
-        color: "",
-        size: "",
-        isAvailable: true,
-      },
-    ]);
-  };
-
-  const handleRemoveVariant = (index: number) => {
-    setVariants(variants.filter((_, idx) => idx !== index));
-  };
-
-  const handleVariantChange = (index: number, field: keyof VariantRow, val: any) => {
-    setVariants(
-      variants.map((v, idx) => (idx === index ? { ...v, [field]: val } : v))
-    );
+  const formatFieldLabel = (key: string) => {
+    if (key.startsWith("variants.")) {
+      const parts = key.split(".");
+      const idx = Number(parts[1]) + 1;
+      const field = parts[2] || "";
+      return `Variant #${idx} ${field ? `(${field.toUpperCase()})` : ""}`;
+    }
+    const map: Record<string, string> = {
+      title: "Product Title",
+      description: "Description",
+      basePrice: "Base Price",
+      categoryId: "Category",
+      images: "Product Images",
+      variants: "Variants & SKUs",
+      checkoutMode: "Checkout Mode",
+      stockMode: "Stock Mode",
+    };
+    return map[key] || key;
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return setError("Title is required");
-    if (!basePrice.trim()) return setError("Base price is required");
-    if (Number(basePrice) < 0) return setError("Base price cannot be negative");
-    if (!categoryId) return setError("Category is required");
-    if (selectedImages.length === 0)
-      return setError("At least one product image is required");
-
-    setSubmitting(true);
     setError(null);
+    setFieldErrors({});
 
     // Map specs list to JSON
     const specsMap: Record<string, string> = {};
@@ -256,23 +262,40 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     const payload = {
       title,
       description,
-      basePrice: Number(basePrice),
+      basePrice: basePrice ? Number(basePrice) : 0,
       checkoutMode,
       stockMode,
       isAvailable,
       categoryId,
       brandId: brandId || null,
       specs: specsMap,
-      variants: variants.map((v) => ({
-        id: v.id,
-        title: v.title.trim() || "Standard",
-        sku: v.sku.trim() || null,
-        price: v.price.trim() ? Number(v.price) : null,
-        stock: Number(v.stock),
-        color: v.color.trim() || null,
-        size: v.size.trim() || null,
-        isAvailable: v.isAvailable,
-      })),
+      variants:
+        matrixVariants.length > 0
+          ? matrixVariants.map((v) => ({
+              id: v.id,
+              title: v.title.trim() || "Standard",
+              sku: v.sku.trim() || "",
+              price: v.price ? Number(v.price) : Number(basePrice || 0),
+              mrp: v.mrp ? Number(v.mrp) : null,
+              stock: stockMode === "TRACKED" ? Number(v.stock || 0) : 0,
+              isActive: v.isActive,
+              isAvailable: isAvailable && v.isActive,
+              attributeValues: v.combination.map((c) => ({
+                attributeId: c.attributeId,
+                attributeValueId: c.attributeValueId,
+              })),
+            }))
+          : [
+              {
+                title: "Standard",
+                sku: singleSku.trim() || "",
+                price: Number(basePrice || 0),
+                mrp: null,
+                stock: stockMode === "TRACKED" ? 10 : 0,
+                isActive: true,
+                isAvailable: isAvailable,
+              },
+            ],
       images: selectedImages.map((si, idx) => ({
         imageId: si.imageId,
         sortOrder: idx,
@@ -280,11 +303,27 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       })),
     };
 
-    const res = await updateProduct(productId, payload);
+    // Client-side Zod Validation
+    const parsed = productInputSchema.safeParse(payload);
+    if (!parsed.success) {
+      const errMap = formatZodErrors(parsed.error);
+      setFieldErrors(errMap);
+      setError(parsed.error.issues[0]?.message || "Please resolve the highlighted validation errors.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setSubmitting(true);
+
+    const res = await updateProduct(productId, payload as any);
     if (res.success) {
       router.push("/admin/products");
     } else {
       setError(res.error || "Failed to update product");
+      if ((res as any).fieldErrors) {
+        setFieldErrors((res as any).fieldErrors);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
       setSubmitting(false);
     }
   };
@@ -310,14 +349,34 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         </Link>
       </div>
 
-      {error && (
+      {/* Validation Error Summary Banner */}
+      {Object.keys(fieldErrors).length > 0 && (
+        <div className="bg-rose-50/95 border border-rose-300 text-rose-900 px-5 py-4 rounded-lg shadow-sm space-y-2 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-800">
+            <AlertCircle size={18} className="text-rose-600 shrink-0" />
+            <span>
+              Please resolve the following {Object.keys(fieldErrors).length} error
+              {Object.keys(fieldErrors).length === 1 ? "" : "s"} before saving:
+            </span>
+          </div>
+          <ul className="list-disc list-inside text-xs space-y-1 text-rose-700 ml-1">
+            {Object.entries(fieldErrors).map(([key, msg]) => (
+              <li key={key}>
+                <span className="font-semibold">{formatFieldLabel(key)}:</span> {msg}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {error && Object.keys(fieldErrors).length === 0 && (
         <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-[6px] flex items-center gap-2">
           <AlertCircle size={18} />
           <span className="text-sm font-semibold">{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <form noValidate onSubmit={handleSave} className="space-y-6">
         {/* ── Section 1: General Info ─────────────────────────────────── */}
         <div className="glass-card p-6 space-y-4">
           <h3 className="font-sans font-bold text-[#0F172A] text-base border-b border-[#E2E8F0] pb-3">
@@ -325,49 +384,127 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           </h3>
 
           <div className="space-y-1">
-            <label className="text-xs text-[#475569] font-bold">Product Title</label>
+            <label className="text-xs text-[#475569] font-bold">
+              Product Title <span className="text-rose-600">*</span>
+            </label>
             <input
               type="text"
-              required
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (fieldErrors.title) {
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.title;
+                    return next;
+                  });
+                }
+              }}
               placeholder="e.g. Finolex 2.5 sqmm FR insulated copper wire"
-              className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:border-[#EA580C] focus:ring-0"
+              className={cn(
+                "w-full bg-white border rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:ring-0",
+                fieldErrors.title
+                  ? "border-rose-500 bg-rose-50/20 focus:border-rose-500"
+                  : "border-[#cbd5e1] focus:border-[#EA580C]"
+              )}
             />
+            {fieldErrors.title && (
+              <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-1 animate-in fade-in">
+                <AlertCircle size={13} className="shrink-0" />
+                {fieldErrors.title}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-[#475569] font-bold">Description</label>
+            <label className="text-xs text-[#475569] font-bold">
+              Description <span className="text-rose-600">*</span>
+            </label>
             <textarea
-              required
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Provide a detailed product description..."
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (fieldErrors.description) {
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.description;
+                    return next;
+                  });
+                }
+              }}
+              placeholder="Provide a detailed product description (minimum 10 characters)..."
               rows={4}
-              className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:border-[#EA580C] focus:ring-0"
+              className={cn(
+                "w-full bg-white border rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:ring-0",
+                fieldErrors.description
+                  ? "border-rose-500 bg-rose-50/20 focus:border-rose-500"
+                  : "border-[#cbd5e1] focus:border-[#EA580C]"
+              )}
             />
+            {fieldErrors.description && (
+              <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-1 animate-in fade-in">
+                <AlertCircle size={13} className="shrink-0" />
+                {fieldErrors.description}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <label className="text-xs text-[#475569] font-bold">Base Price (INR)</label>
+              <label className="text-xs text-[#475569] font-bold">
+                Base Price (INR) <span className="text-rose-600">*</span>
+              </label>
               <input
                 type="number"
-                required
                 value={basePrice}
-                onChange={(e) => setBasePrice(e.target.value)}
+                onChange={(e) => {
+                  setBasePrice(e.target.value);
+                  if (fieldErrors.basePrice) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.basePrice;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder="2200"
-                className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:border-[#EA580C] font-mono"
+                className={cn(
+                  "w-full bg-white border rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none font-mono",
+                  fieldErrors.basePrice
+                    ? "border-rose-500 bg-rose-50/20 focus:border-rose-500"
+                    : "border-[#cbd5e1] focus:border-[#EA580C]"
+                )}
               />
+              {fieldErrors.basePrice && (
+                <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-1 animate-in fade-in">
+                  <AlertCircle size={13} className="shrink-0" />
+                  {fieldErrors.basePrice}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-[#475569] font-bold">Category</label>
+              <label className="text-xs text-[#475569] font-bold">
+                Category <span className="text-rose-600">*</span>
+              </label>
               <select
-                required
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none focus:border-[#EA580C]"
+                onChange={(e) => {
+                  setCategoryId(e.target.value);
+                  if (fieldErrors.categoryId) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.categoryId;
+                      return next;
+                    });
+                  }
+                }}
+                className={cn(
+                  "w-full bg-white border rounded-[6px] px-3 py-2.5 text-sm text-[#0f172a] focus:outline-none",
+                  fieldErrors.categoryId
+                    ? "border-rose-500 bg-rose-50/20 focus:border-rose-500"
+                    : "border-[#cbd5e1] focus:border-[#EA580C]"
+                )}
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -375,6 +512,12 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                   </option>
                 ))}
               </select>
+              {fieldErrors.categoryId && (
+                <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-1 animate-in fade-in">
+                  <AlertCircle size={13} className="shrink-0" />
+                  {fieldErrors.categoryId}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -461,7 +604,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                 <div key={idx} className="flex items-center gap-3">
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Warranty"
                     value={s.key}
                     onChange={(e) => handleSpecChange(idx, "key", e.target.value)}
@@ -469,7 +611,6 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                   />
                   <input
                     type="text"
-                    required
                     placeholder="e.g. 2 Years"
                     value={s.value}
                     onChange={(e) => handleSpecChange(idx, "value", e.target.value)}
@@ -491,9 +632,14 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         {/* ── Section 3: Media References ────────────────────────────── */}
         <div className="glass-card p-6 space-y-4">
           <div className="flex justify-between items-center border-b border-[#E2E8F0] pb-3">
-            <h3 className="font-sans font-bold text-[#0F172A] text-base">
-              Product Images
-            </h3>
+            <div>
+              <h3 className="font-sans font-bold text-[#0F172A] text-base">
+                Product Images <span className="text-rose-600">*</span>
+              </h3>
+              <p className="text-xs text-[#64748B] mt-0.5">
+                Select high-resolution images. Mark one as the main hero photo.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setShowImagePicker(!showImagePicker)}
@@ -504,10 +650,17 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             </button>
           </div>
 
+          {fieldErrors.images && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-[6px] text-xs text-rose-800 font-semibold flex items-center gap-2 animate-in fade-in">
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
+              <span>{fieldErrors.images}</span>
+            </div>
+          )}
+
           {/* Selected Images Grid */}
           {selectedImages.length === 0 ? (
             <div className="border border-dashed border-[#E2E8F0] bg-[#F8FAFC] rounded-[6px] p-8 text-center text-slate-400">
-              <ImageIcon size={32} className="mx-auto text-slate-350 mb-2" />
+              <ImageIcon size={32} className="mx-auto text-slate-300 mb-2" />
               <p className="text-xs font-bold text-[#0F172A]">No images selected</p>
               <p className="text-[10px] text-slate-500 mt-1">Click the select button to tie existing library images.</p>
             </div>
@@ -540,7 +693,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                     <button
                       type="button"
                       onClick={() => handleToggleImage({ id: si.imageId, url: si.url } as any)}
-                      className="p-1.5 rounded-[4px] bg-rose-605 border border-rose-700 text-white hover:bg-rose-700 transition-colors"
+                      className="p-1.5 rounded-[4px] bg-rose-600 border border-rose-700 text-white hover:bg-rose-700 transition-colors"
                       title="Remove image"
                     >
                       <Trash2 size={12} />
@@ -599,131 +752,54 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           )}
         </div>
 
-        {/* ── Section 4: Variant Manager ──────────────────────────────── */}
+        {/* ── Section 4: Variant Matrix & SKUs ───────────────────────── */}
         <div className="glass-card p-6 space-y-4">
-          <div className="flex justify-between items-center border-b border-[#E2E8F0] pb-3">
+          <div className="border-b border-[#E2E8F0] pb-3">
             <h3 className="font-sans font-bold text-[#0F172A] text-base">
-              Product Variants
+              Product Variants & SKUs <span className="text-rose-600">*</span>
             </h3>
-            <button
-              type="button"
-              onClick={handleAddVariant}
-              className="py-1.5 px-3 rounded-[4px] bg-[#F8FAFC] border border-[#E2E8F0] hover:border-[#EA580C]/40 text-xs font-bold text-[#475569] hover:text-[#0F172A] transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={12} />
-              Add Variant
-            </button>
+            <p className="text-xs text-[#64748B] mt-0.5">
+              Build and configure variant combinations, individual pricing, and unique SKU identifiers.
+            </p>
           </div>
 
-          <div className="space-y-4 divide-y divide-[#E2E8F0]">
-            {variants.map((v, idx) => (
-              <div key={idx} className={`pt-4 ${idx === 0 ? "pt-0" : ""} space-y-3`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#475569]">Variant #{idx + 1}</span>
-                  {variants.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveVariant(idx)}
-                      className="text-xs text-rose-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 size={11} />
-                      Remove Variant
-                    </button>
-                  )}
-                </div>
+          {fieldErrors.variants && (
+            <div className="p-3 bg-rose-50 border border-rose-300 rounded-[6px] text-xs text-rose-800 font-semibold flex items-center gap-2 animate-in fade-in">
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
+              <span>{fieldErrors.variants}</span>
+            </div>
+          )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">Variant Title</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Classy White / 1200mm"
-                      value={v.title}
-                      onChange={(e) => handleVariantChange(idx, "title", e.target.value)}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">SKU (Unique Identifier)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ORN-BLDC-1200-WHT"
-                      value={v.sku}
-                      onChange={(e) => handleVariantChange(idx, "sku", e.target.value)}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C] font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">
-                      Price Override (INR, optional)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Leave blank to inherit product base price"
-                      value={v.price}
-                      onChange={(e) => handleVariantChange(idx, "price", e.target.value)}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C] font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">Stock Count</label>
-                    <input
-                      type="number"
-                      required
-                      disabled={stockMode !== "TRACKED"}
-                      value={v.stock}
-                      onChange={(e) => handleVariantChange(idx, "stock", Number(e.target.value))}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C] font-mono disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">Color (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. White"
-                      value={v.color}
-                      onChange={(e) => handleVariantChange(idx, "color", e.target.value)}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#475569] font-bold">Size (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 1200mm"
-                      value={v.size}
-                      onChange={(e) => handleVariantChange(idx, "size", e.target.value)}
-                      className="w-full bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs text-[#0f172a] focus:outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-5 pl-2">
-                    <input
-                      type="checkbox"
-                      id={`var-active-${idx}`}
-                      checked={v.isAvailable}
-                      onChange={(e) => handleVariantChange(idx, "isAvailable", e.target.checked)}
-                      className="rounded border-[#cbd5e1] text-[#EA580C] focus:ring-[#EA580C] w-3.5 h-3.5 bg-white cursor-pointer"
-                    />
-                    <label
-                      htmlFor={`var-active-${idx}`}
-                      className="text-[11px] text-[#475569] font-semibold cursor-pointer"
-                    >
-                      Variant Active
-                    </label>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <VariantMatrixBuilder
+            categoryId={categoryId}
+            categoryName={categories.find((c) => c.id === categoryId)?.name}
+            brandSlug={brands.find((b) => b.id === brandId)?.name || "VE"}
+            categorySlug={categories.find((c) => c.id === categoryId)?.name || "CAT"}
+            productTitle={title}
+            basePrice={Number(basePrice) || 0}
+            variants={matrixVariants}
+            onChange={(vars) => {
+              setMatrixVariants(vars);
+              if (fieldErrors.variants) {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.variants;
+                  return next;
+                });
+              }
+            }}
+            singleSku={singleSku}
+            onSingleSkuChange={(sku) => {
+              setSingleSku(sku);
+              if (fieldErrors.variants) {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.variants;
+                  return next;
+                });
+              }
+            }}
+          />
         </div>
 
         {/* Submit Actions */}

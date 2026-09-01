@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { productInputSchema, formatZodErrors } from "@/lib/validations/product";
 
 export async function getProducts() {
   try {
@@ -50,7 +51,22 @@ export async function getProductDetails(id: string) {
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
-        variants: true,
+        variants: {
+          include: {
+            attributeValues: {
+              include: {
+                attribute: true,
+                attributeValue: true,
+              },
+            },
+          },
+        },
+        attributeValues: {
+          include: {
+            attribute: true,
+            attributeValue: true,
+          },
+        },
         images: {
           include: {
             image: true,
@@ -112,13 +128,20 @@ export async function createProduct(data: {
   brandId?: string | null;
   specs: Record<string, string>;
   variants: {
+    id?: string;
     title: string;
     sku?: string | null;
     price?: number | null;
+    mrp?: number | null;
     stock: number;
     color?: string | null;
     size?: string | null;
-    isAvailable: boolean;
+    isActive?: boolean;
+    isAvailable?: boolean;
+    attributeValues?: Array<{
+      attributeId: string;
+      attributeValueId: string;
+    }>;
   }[];
   images: {
     imageId: string;
@@ -127,42 +150,61 @@ export async function createProduct(data: {
   }[];
 }) {
   try {
-    if (!data.title.trim()) throw new Error("Title is required");
-    if (!data.categoryId) throw new Error("Category is required");
-    if (data.images.length === 0)
-      throw new Error("At least one image is required to publish a product.");
+    const parsed = productInputSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message || "Product validation failed",
+        fieldErrors: formatZodErrors(parsed.error),
+      };
+    }
+    const validData = parsed.data;
 
     // Perform database operations in a transaction
     const newProduct = await prisma.$transaction(async (tx) => {
       // 1. Create product
       const product = await tx.product.create({
         data: {
-          title: data.title.trim(),
-          description: data.description.trim(),
-          basePrice: Number(data.basePrice),
-          checkoutMode: data.checkoutMode,
-          stockMode: data.stockMode,
-          isAvailable: data.isAvailable,
-          categoryId: data.categoryId,
-          brandId: data.brandId || null,
-          specs: JSON.stringify(data.specs),
+          title: validData.title,
+          description: validData.description,
+          basePrice: validData.basePrice,
+          checkoutMode: validData.checkoutMode,
+          stockMode: validData.stockMode,
+          isAvailable: validData.isAvailable,
+          categoryId: validData.categoryId,
+          brandId: validData.brandId || null,
+          specs: JSON.stringify(validData.specs || {}),
         },
       });
 
-      // 2. Create variants
+      // 2. Create variants & linkages
       if (data.variants.length > 0) {
-        await tx.productVariant.createMany({
-          data: data.variants.map((v) => ({
-            productId: product.id,
-            title: v.title.trim(),
-            sku: v.sku?.trim() || null,
-            price: v.price ? Number(v.price) : null,
-            stock: Number(v.stock),
-            color: v.color?.trim() || null,
-            size: v.size?.trim() || null,
-            isAvailable: v.isAvailable,
-          })),
-        });
+        for (const v of data.variants) {
+          const createdVariant = await tx.productVariant.create({
+            data: {
+              productId: product.id,
+              title: v.title.trim(),
+              sku: v.sku?.trim() || null,
+              price: v.price ? Number(v.price) : null,
+              mrp: v.mrp ? Number(v.mrp) : null,
+              stock: Number(v.stock),
+              color: v.color?.trim() || null,
+              size: v.size?.trim() || null,
+              isActive: v.isActive !== false,
+              isAvailable: v.isAvailable !== false,
+            },
+          });
+
+          if (v.attributeValues && v.attributeValues.length > 0) {
+            await tx.variantAttributeValue.createMany({
+              data: v.attributeValues.map((av) => ({
+                variantId: createdVariant.id,
+                attributeId: av.attributeId,
+                attributeValueId: av.attributeValueId,
+              })),
+            });
+          }
+        }
       } else {
         // Create default variant if none provided
         await tx.productVariant.create({
@@ -171,6 +213,7 @@ export async function createProduct(data: {
             title: "Standard",
             stock: 0,
             isAvailable: true,
+            isActive: true,
           },
         });
       }
@@ -215,10 +258,16 @@ export async function updateProduct(
       title: string;
       sku?: string | null;
       price?: number | null;
+      mrp?: number | null;
       stock: number;
       color?: string | null;
       size?: string | null;
-      isAvailable: boolean;
+      isActive?: boolean;
+      isAvailable?: boolean;
+      attributeValues?: Array<{
+        attributeId: string;
+        attributeValueId: string;
+      }>;
     }[];
     images: {
       imageId: string;
@@ -228,25 +277,30 @@ export async function updateProduct(
   }
 ) {
   try {
-    if (!data.title.trim()) throw new Error("Title is required");
-    if (!data.categoryId) throw new Error("Category is required");
-    if (data.images.length === 0)
-      throw new Error("At least one image is required to publish a product.");
+    const parsed = productInputSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message || "Product validation failed",
+        fieldErrors: formatZodErrors(parsed.error),
+      };
+    }
+    const validData = parsed.data;
 
     await prisma.$transaction(async (tx) => {
       // 1. Update product base data
       await tx.product.update({
         where: { id },
         data: {
-          title: data.title.trim(),
-          description: data.description.trim(),
-          basePrice: Number(data.basePrice),
-          checkoutMode: data.checkoutMode,
-          stockMode: data.stockMode,
-          isAvailable: data.isAvailable,
-          categoryId: data.categoryId,
-          brandId: data.brandId || null,
-          specs: JSON.stringify(data.specs),
+          title: validData.title,
+          description: validData.description,
+          basePrice: validData.basePrice,
+          checkoutMode: validData.checkoutMode,
+          stockMode: validData.stockMode,
+          isAvailable: validData.isAvailable,
+          categoryId: validData.categoryId,
+          brandId: validData.brandId || null,
+          specs: JSON.stringify(validData.specs || {}),
         },
       });
 
@@ -287,6 +341,7 @@ export async function updateProduct(
 
       // Update matching variants & create new ones
       for (const v of data.variants) {
+        let variantId = v.id;
         if (v.id) {
           // Update
           await tx.productVariant.update({
@@ -295,25 +350,44 @@ export async function updateProduct(
               title: v.title.trim(),
               sku: v.sku?.trim() || null,
               price: v.price ? Number(v.price) : null,
+              mrp: v.mrp ? Number(v.mrp) : null,
               stock: Number(v.stock),
               color: v.color?.trim() || null,
               size: v.size?.trim() || null,
-              isAvailable: v.isAvailable,
+              isActive: v.isActive !== false,
+              isAvailable: v.isAvailable !== false,
             },
+          });
+
+          await tx.variantAttributeValue.deleteMany({
+            where: { variantId: v.id },
           });
         } else {
           // Create
-          await tx.productVariant.create({
+          const created = await tx.productVariant.create({
             data: {
               productId: id,
               title: v.title.trim(),
               sku: v.sku?.trim() || null,
               price: v.price ? Number(v.price) : null,
+              mrp: v.mrp ? Number(v.mrp) : null,
               stock: Number(v.stock),
               color: v.color?.trim() || null,
               size: v.size?.trim() || null,
-              isAvailable: v.isAvailable,
+              isActive: v.isActive !== false,
+              isAvailable: v.isAvailable !== false,
             },
+          });
+          variantId = created.id;
+        }
+
+        if (v.attributeValues && v.attributeValues.length > 0 && variantId) {
+          await tx.variantAttributeValue.createMany({
+            data: v.attributeValues.map((av) => ({
+              variantId,
+              attributeId: av.attributeId,
+              attributeValueId: av.attributeValueId,
+            })),
           });
         }
       }

@@ -9,6 +9,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   description?: string;
+  subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: "sm" | "md" | "lg" | "xl";
@@ -20,11 +21,13 @@ export default function Modal({
   onClose,
   title,
   description,
+  subtitle,
   children,
   footer,
   maxWidth = "md",
   className,
 }: ModalProps) {
+  const descText = description || subtitle;
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && isOpen) {
@@ -72,7 +75,7 @@ export default function Modal({
         )}
       >
         {/* Header */}
-        {(title || description) && (
+        {(title || descText) && (
           <div className="flex items-start justify-between gap-4 p-5 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
             <div>
               {title && (
@@ -83,12 +86,12 @@ export default function Modal({
                   {title}
                 </h3>
               )}
-              {description && (
+              {descText && (
                 <p
                   id="modal-desc"
                   className="text-[var(--text-sm)] text-[var(--color-fg-muted)] mt-1"
                 >
-                  {description}
+                  {descText}
                 </p>
               )}
             </div>

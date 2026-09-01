@@ -21,8 +21,11 @@ import {
   Image as ImageIcon,
   Folder,
   ChevronRight,
+  Sliders,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import Drawer from "@/components/admin/ui/Drawer";
+import CategoryAttributesTab from "@/components/admin/categories/CategoryAttributesTab";
 
 // ── Zod Schemas ────────────────────────────────────────────────────────────────
 
@@ -89,6 +92,8 @@ export default function CategoriesPage() {
 
   // Column Selection State
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [rightTab, setRightTab] = useState<"subcategories" | "attributes">("subcategories");
+  const [activeSubDrawerCategory, setActiveSubDrawerCategory] = useState<{ id: string; name: string } | null>(null);
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -483,91 +488,136 @@ export default function CategoriesPage() {
               </div>
             </div>
 
-            {/* Right Column: Sub-categories list */}
+            {/* Right Column: Sub-categories or Attributes */}
             {selectedParent ? (
               <div className="glass-card p-6 border border-[#E2E8F0]">
                 {/* Header info */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E8F0] pb-4 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E8F0] pb-4 mb-5">
                   <div>
                     <p className="text-xs text-[#94A3B8] font-bold">
                       Parent Category <span className="text-[#EA580C] font-extrabold">› {selectedParent.name}</span>
                     </p>
-                    <h4 className="text-lg font-bold text-[#0F172A] mt-1">Sub-categories</h4>
+                    <div className="flex items-center gap-3 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setRightTab("subcategories")}
+                        className={`pb-1 text-sm font-bold border-b-2 transition-colors ${
+                          rightTab === "subcategories"
+                            ? "border-[#EA580C] text-[#0F172A]"
+                            : "border-transparent text-slate-400 hover:text-slate-700"
+                        }`}
+                      >
+                        Sub-categories ({subCategories.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRightTab("attributes")}
+                        className={`pb-1 text-sm font-bold border-b-2 transition-colors flex items-center gap-1.5 ${
+                          rightTab === "attributes"
+                            ? "border-[#EA580C] text-[#0F172A]"
+                            : "border-transparent text-slate-400 hover:text-slate-700"
+                        }`}
+                      >
+                        <Sliders size={13} className={rightTab === "attributes" ? "text-[#EA580C]" : "text-slate-400"} />
+                        <span>Category Attributes</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleOpenCreateSubWithFlag}
-                    className="inline-flex items-center gap-1.5 border border-[#EA580C] text-[#EA580C] hover:bg-[#FFF7ED] py-2 px-4 rounded-[4px] font-bold text-xs cursor-pointer transition-colors"
-                  >
-                    <Plus size={14} />
-                    Add Sub-category
-                  </button>
+                  {rightTab === "subcategories" && (
+                    <button
+                      onClick={handleOpenCreateSubWithFlag}
+                      className="inline-flex items-center gap-1.5 border border-[#EA580C] text-[#EA580C] hover:bg-[#FFF7ED] py-2 px-4 rounded-[4px] font-bold text-xs cursor-pointer transition-colors"
+                    >
+                      <Plus size={14} />
+                      Add Sub-category
+                    </button>
+                  )}
                 </div>
 
-                {/* Sub Categories Grid */}
-                {subCategories.length === 0 ? (
-                  <div className="text-center py-12 text-[#64748B]">
-                    <Folder className="mx-auto text-slate-200 mb-3" size={40} />
-                    <p className="text-sm font-semibold">No sub-categories in this parent</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Click &quot;Add Sub-category&quot; to list products under this section.</p>
-                  </div>
+                {rightTab === "attributes" ? (
+                  <CategoryAttributesTab
+                    categoryId={selectedParent.id}
+                    categoryName={selectedParent.name}
+                  />
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {subCategories.map((sub) => (
-                      <div
-                        key={sub.id}
-                        className="bg-white border border-[#E2E8F0] rounded-[8px] overflow-hidden flex flex-col justify-between"
-                      >
-                        <div className="relative height h-[130px] bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-center overflow-hidden">
-                          <span
-                            className={`absolute top-2.5 left-2.5 z-10 text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                              sub.defaultCheckoutMode === "BUY"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                                : "bg-blue-50 text-blue-700 border-blue-100"
-                            }`}
-                          >
-                            {sub.defaultCheckoutMode}
-                          </span>
-                          {sub.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={sub.image.url} alt={sub.name} className="object-contain w-full h-full p-2" />
-                          ) : (
-                            <Folder size={32} className="text-slate-300" />
-                          )}
-                        </div>
-
-                        <div className="p-4 flex-1 flex flex-col justify-between">
-                          <div>
-                            <p className="font-bold text-sm text-[#0F172A]">{sub.name}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-semibold">
-                              {sub._count.products} products in catalog
-                            </p>
-                          </div>
-
-                          <div className="flex gap-2 border-t border-slate-100 pt-3 mt-3 justify-end">
-                            <button
-                              onClick={() => handleOpenEditWithFlag(sub)}
-                              className="p-1.5 rounded-[4px] border border-[#E2E8F0] hover:border-[#EA580C]/35 text-[#475569] hover:text-[#0F172A] transition-colors"
-                              title="Edit"
-                            >
-                              <Edit size={12} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(sub.id)}
-                              disabled={sub._count.products > 0}
-                              className={`p-1.5 rounded-[4px] border transition-colors ${
-                                sub._count.products > 0
-                                  ? "bg-slate-100 border-slate-200 text-slate-350 cursor-not-allowed"
-                                  : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+                  /* Sub Categories Grid */
+                  subCategories.length === 0 ? (
+                    <div className="text-center py-12 text-[#64748B]">
+                      <Folder className="mx-auto text-slate-200 mb-3" size={40} />
+                      <p className="text-sm font-semibold">No sub-categories in this parent</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Click &quot;Add Sub-category&quot; to list products under this section.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {subCategories.map((sub) => (
+                        <div
+                          key={sub.id}
+                          className="bg-white border border-[#E2E8F0] rounded-[8px] overflow-hidden flex flex-col justify-between"
+                        >
+                          <div className="relative height h-[130px] bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-center overflow-hidden">
+                            <span
+                              className={`absolute top-2.5 left-2.5 z-10 text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                sub.defaultCheckoutMode === "BUY"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                  : "bg-blue-50 text-blue-700 border-blue-100"
                               }`}
-                              title={sub._count.products > 0 ? "In use by products" : "Delete"}
                             >
-                              <Trash2 size={12} />
-                            </button>
+                              {sub.defaultCheckoutMode}
+                            </span>
+                            {sub.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={sub.image.url} alt={sub.name} className="object-contain w-full h-full p-2" />
+                            ) : (
+                              <Folder size={32} className="text-slate-300" />
+                            )}
+                          </div>
+
+                          <div className="p-4 flex-1 flex flex-col justify-between">
+                            <div>
+                              <p className="font-bold text-sm text-[#0F172A]">{sub.name}</p>
+                              <p className="text-xs text-slate-500 mt-1 font-semibold">
+                                {sub._count.products} products in catalog
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-3">
+                              <button
+                                type="button"
+                                onClick={() => setActiveSubDrawerCategory({ id: sub.id, name: sub.name })}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-orange-600 hover:text-brand-orange-700 bg-brand-orange-50 px-2 py-1 rounded"
+                                title="Configure Attributes"
+                              >
+                                <Sliders size={12} />
+                                <span>Attributes</span>
+                              </button>
+
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleOpenEditWithFlag(sub)}
+                                  className="p-1.5 rounded-[4px] border border-[#E2E8F0] hover:border-[#EA580C]/35 text-[#475569] hover:text-[#0F172A] transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit size={12} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(sub.id)}
+                                  disabled={sub._count.products > 0}
+                                  className={`p-1.5 rounded-[4px] border transition-colors ${
+                                    sub._count.products > 0
+                                      ? "bg-slate-100 border-slate-200 text-slate-350 cursor-not-allowed"
+                                      : "bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100"
+                                  }`}
+                                  title={sub._count.products > 0 ? "In use by products" : "Delete"}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
             ) : (
@@ -578,6 +628,22 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
+
+      {/* Sub-Category Attributes Slide-over Drawer */}
+      <Drawer
+        isOpen={Boolean(activeSubDrawerCategory)}
+        onClose={() => setActiveSubDrawerCategory(null)}
+        title={activeSubDrawerCategory ? `Attributes: ${activeSubDrawerCategory.name}` : ""}
+        subtitle="Manage inherited attributes and sub-category specific fields"
+        width="wide"
+      >
+        {activeSubDrawerCategory && (
+          <CategoryAttributesTab
+            categoryId={activeSubDrawerCategory.id}
+            categoryName={activeSubDrawerCategory.name}
+          />
+        )}
+      </Drawer>
 
       {/* ── Create/Edit Modal ───────────────────────────────────────── */}
       <Modal

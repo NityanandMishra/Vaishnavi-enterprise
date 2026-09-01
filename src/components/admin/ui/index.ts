@@ -25,7 +25,7 @@ export { default as ConfirmDialog } from "./ConfirmDialog";
 
 export { default as Drawer } from "./Drawer";
 
-export { ToastProvider, useToast } from "./Toast";
+export { ToastProvider, useToast, toast } from "./Toast";
 export type { ToastItem, ToastType } from "./Toast";
 
 export { default as FormLayout, FormSection, FormField } from "./FormLayout";

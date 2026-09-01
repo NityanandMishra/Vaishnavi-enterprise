@@ -10,7 +10,8 @@ interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
   title: string; // Must name the object: e.g. "Delete Cotton Kurta Set?"
-  description: string;
+  description?: string;
+  message?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "default";
@@ -25,6 +26,7 @@ export default function ConfirmDialog({
   onConfirm,
   title,
   description,
+  message,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "danger",
@@ -32,6 +34,7 @@ export default function ConfirmDialog({
   confirmationCount = 0,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const descText = description || message || "";
   const [typedCount, setTypedCount] = useState("");
 
   useEffect(() => {
@@ -85,7 +88,7 @@ export default function ConfirmDialog({
               <AlertTriangle size={18} />
             </div>
           )}
-          <p className="text-[var(--color-fg-muted)] leading-relaxed">{description}</p>
+          <p className="text-[var(--color-fg-muted)] leading-relaxed">{descText}</p>
         </div>
 
         {requiresCountConfirmation && confirmationCount > 10 && (

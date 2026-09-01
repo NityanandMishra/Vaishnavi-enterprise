@@ -153,10 +153,11 @@ model Category {
   updatedAt           DateTime  @updatedAt
   deletedAt           DateTime?
 
-  image    MediaImage? @relation(fields: [imageId], references: [id])
-  parent   Category?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children Category[]  @relation("CategoryHierarchy")
-  products Product[]
+  image              MediaImage?         @relation(fields: [imageId], references: [id])
+  parent             Category?           @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children           Category[]          @relation("CategoryHierarchy")
+  products           Product[]
+  categoryAttributes CategoryAttribute[]
 
   // No two categories may share the same name within the same parent scope
   @@unique([name, parentId])
@@ -184,15 +185,16 @@ model Product {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  category   Category       @relation(fields: [categoryId], references: [id])
-  brand      Brand?         @relation(fields: [brandId], references: [id])
-  images     ProductImage[]
-  variants   ProductVariant[]
-  wishlist   WishlistItem[]
-  reviews    Review[]
-  leads      Lead[]
-  orderItems OrderItem[]
-  cartItems  CartItem[]
+  category        Category                @relation(fields: [categoryId], references: [id])
+  brand           Brand?                  @relation(fields: [brandId], references: [id])
+  images          ProductImage[]
+  variants        ProductVariant[]
+  attributeValues ProductAttributeValue[]
+  wishlist        WishlistItem[]
+  reviews         Review[]
+  leads           Lead[]
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
 }
 
 // ─── PRODUCT IMAGE (Join Table) ───────────────────────────────────────────────
@@ -217,16 +219,104 @@ model ProductVariant {
   productId   String
   title       String    // e.g. "1200mm Brown", "2.5mm Black 90M", "50W Cool White"
   price       Float?    // null = inherits product basePrice
+  mrp         Float?    // Maximum Retail Price
   stock       Int       @default(0) // Active only when Product.stockMode = "TRACKED"
   sku         String?   @unique
   color       String?
   size        String?
   isAvailable Boolean   @default(true)
+  isActive    Boolean   @default(true)
   deletedAt   DateTime?
 
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems  CartItem[]
-  orderItems OrderItem[]
+  product         Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributeValues VariantAttributeValue[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+}
+
+// ─── ATTRIBUTES & VARIANTS (EPIC-01: ATTR) ──────────────────────────────────
+// inputType values: "SINGLE_SELECT" | "MULTI_SELECT" | "TEXT" | "NUMBER" | "BOOLEAN"
+
+model Attribute {
+  id                String    @id @default(uuid())
+  name              String
+  code              String    @unique // Lowercase slug, immutable after creation
+  inputType         String    @default("SINGLE_SELECT") // "SINGLE_SELECT" | "MULTI_SELECT" | "TEXT" | "NUMBER" | "BOOLEAN"
+  isVariantDefining Boolean   @default(false) // true only for SINGLE_SELECT attributes that generate SKUs
+  description       String?
+  usesSwatches      Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  values             AttributeValue[]
+  categoryAttributes CategoryAttribute[]
+  productValues      ProductAttributeValue[]
+  variantValues      VariantAttributeValue[]
+}
+
+model AttributeValue {
+  id             String    @id @default(uuid())
+  attributeId    String
+  label          String
+  code           String    // Lowercase slug, immutable after creation
+  swatchHex      String?   // e.g. "#006A4E"
+  swatchImageUrl String?   // URL for texture swatches
+  displayOrder   Int       @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  attribute              Attribute               @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  productAttributeValues ProductAttributeValue[]
+  variantAttributeValues VariantAttributeValue[]
+
+  @@unique([attributeId, code])
+}
+
+model CategoryAttribute {
+  id           String   @id @default(uuid())
+  categoryId   String
+  attributeId  String
+  isRequired   Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  category  Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, attributeId])
+}
+
+model ProductAttributeValue {
+  id               String   @id @default(uuid())
+  productId        String
+  attributeId      String
+  attributeValueId String?  // Set for SELECT / MULTI_SELECT
+  textValue        String?  // Set for TEXT
+  numberValue      Float?   // Set for NUMBER
+  boolValue        Boolean? // Set for BOOLEAN
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute      Attribute       @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue? @relation(fields: [attributeValueId], references: [id])
+}
+
+model VariantAttributeValue {
+  id               String @id @default(uuid())
+  variantId        String
+  attributeId      String
+  attributeValueId String
+
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  attribute      Attribute      @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [attributeValueId], references: [id])
+
+  @@unique([variantId, attributeId])
 }
 
 // ─── CART (Required for Server-Side Cart Persistence) ────────────────────────
