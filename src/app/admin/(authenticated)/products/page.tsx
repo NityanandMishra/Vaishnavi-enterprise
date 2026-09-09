@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import {
-  getProducts,
-  deleteProduct,
-  toggleProductAvailability,
-} from "./actions";
+import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -17,169 +14,426 @@ import {
   Check,
   AlertCircle,
   Eye,
-  EyeOff,
+  Power,
+  Copy,
+  Download,
+  Upload,
+  Filter,
+  MoreVertical,
+  CheckSquare,
+  Square,
+  Sparkles,
+  Sliders,
+  DollarSign,
+  Bookmark,
+  ChevronDown,
+  X,
+  RotateCcw,
+  Archive,
+  RefreshCw,
 } from "lucide-react";
 import { formatINR } from "@/lib/utils";
-
-interface Product {
-  id: string;
-  title: string;
-  basePrice: number;
-  checkoutMode: string;
-  stockMode: string;
-  isAvailable: boolean;
-  categoryId: string;
-  brandId: string | null;
-  category: {
-    name: string;
-  };
-  brand: {
-    name: string;
-  } | null;
-  variants: {
-    id: string;
-    title: string;
-    sku: string | null;
-    price: number | null;
-    stock: number;
-    isAvailable: boolean;
-  }[];
-  images: {
-    isMain: boolean;
-    image: {
-      url: string;
-      filename: string;
-    };
-  }[];
-}
+import StatusBadge from "@/components/admin/ui/StatusBadge";
+import ConfirmDialog from "@/components/admin/ui/ConfirmDialog";
+import Modal from "@/components/admin/ui/Modal";
+import { toast } from "@/components/admin/ui/Toast";
+import ProductQuickViewDrawer, { QuickViewProduct } from "@/components/admin/products/ProductQuickViewDrawer";
+import BulkPriceAdjustModal from "@/components/admin/products/BulkPriceAdjustModal";
+import {
+  getProducts,
+  getFormMetadata,
+  updateProductStatus,
+  duplicateProduct,
+  bulkUpdateStatus,
+  bulkChangeCategory,
+  deleteProduct,
+  getSavedViews,
+  saveProductView,
+  deleteSavedView,
+} from "./actions";
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // ─── DATA STATE ──────────────────────────────────────────────────────────
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState({
+    all: 0,
+    active: 0,
+    draft: 0,
+    inactive: 0,
+    archived: 0,
+  });
 
-  // Search & Filters
+  // ─── FILTERS STATE ───────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusTab, setStatusTab] = useState<"ALL" | "ACTIVE" | "DRAFT" | "INACTIVE" | "ARCHIVED">("ALL");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
-  const [selectedStock, setSelectedStock] = useState<"ALL" | "INSTOCK" | "OUTOFSTOCK">("ALL");
+  const [selectedBrand, setSelectedBrand] = useState("ALL");
+  const [selectedStock, setSelectedStock] = useState<"ALL" | "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK">("ALL");
 
+  // Selection state for Bulk Actions
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Modals & Drawers state
+  const [quickViewProduct, setQuickViewProduct] = useState<QuickViewProduct | null>(null);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [isPriceAdjustModalOpen, setIsPriceAdjustModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [bulkTargetCategory, setBulkTargetCategory] = useState("");
+
+  // Saved Views
+  const [savedViews, setSavedViews] = useState<Array<{ id: string; name: string; filters: string }>>([]);
+  const [isSavedViewModalOpen, setIsSavedViewModalOpen] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+  const [isSavedViewsDropdownOpen, setIsSavedViewsDropdownOpen] = useState(false);
+
+  // Single item action dialogs
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // ─── INITIAL LOAD ────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchProducts();
+    loadMetadata();
+    loadSavedViews();
   }, []);
+
+  const loadMetadata = async () => {
+    const meta = await getFormMetadata();
+    if (meta.success) {
+      if (meta.categories) setCategories(meta.categories);
+      if (meta.brands) setBrands(meta.brands);
+    }
+  };
+
+  const loadSavedViews = async () => {
+    const res = await getSavedViews();
+    if (res.success) {
+      setSavedViews(res.views);
+    }
+  };
+
+  // ─── FETCH PRODUCTS (DEBOUNCED & SERVER PAGINATED) ────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [page, searchQuery, statusTab, selectedCategory, selectedBrand, selectedStock]);
 
   const fetchProducts = async () => {
     setLoading(true);
-    setError(null);
-    const res = await getProducts();
-    if (res.success && res.products) {
-      setProducts(res.products as any);
-    } else {
-      setError(res.error || "Failed to load products");
+    try {
+      const res = await getProducts({
+        page,
+        limit: 20,
+        search: searchQuery,
+        status: statusTab,
+        categoryId: selectedCategory,
+        brandId: selectedBrand,
+        stockState: selectedStock,
+      });
+
+      if (res.success && res.products) {
+        setProducts(res.products);
+        if (res.pagination) {
+          setTotalCount(res.pagination.totalCount);
+          setTotalPages(res.pagination.totalPages);
+        }
+        if (res.counts) {
+          setCounts(res.counts);
+        }
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to load product catalog");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleToggleStatus = async (id: string, currentStatus: boolean) => {
-    const res = await toggleProductAvailability(id, !currentStatus);
+  // ─── SELECTION LOGIC (CROSS-PAGE PRESERVED) ──────────────────────────────
+  const toggleSelectAll = () => {
+    const currentPageIds = products.map((p) => p.id);
+    const allSelectedOnPage = currentPageIds.every((id) => selectedIds.includes(id));
+
+    if (allSelectedOnPage) {
+      setSelectedIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentPageIds])));
+    }
+  };
+
+  const toggleSelectOne = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  // ─── QUICK VIEW DRAWER NAVIGATION (J / K) ────────────────────────────────
+  const handleOpenQuickView = (product: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setQuickViewProduct(product);
+    setIsQuickViewOpen(true);
+  };
+
+  // ─── SINGLE ACTIONS ──────────────────────────────────────────────────────
+  const handleDuplicate = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await duplicateProduct(id);
+      if (res.success && res.newProductId) {
+        toast.success("Product Duplicated", "Created draft copy. Opening editor...");
+        router.push(`/admin/products/${res.newProductId}/edit`);
+      } else {
+        toast.error("Duplicate Failed", res.error || "Could not duplicate product");
+      }
+    } catch (err) {
+      toast.error("Error", "Failed to duplicate product");
+    }
+  };
+
+  const handleToggleStatus = async (product: any, target: "ACTIVE" | "INACTIVE" | "ARCHIVED" | "RESTORE", e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await updateProductStatus(product.id, target);
+      if (res.success) {
+        toast.success(
+          "Status Updated",
+          target === "RESTORE" ? "Restored as Inactive" : `Status changed to ${target.toLowerCase()}`
+        );
+        fetchProducts();
+      } else {
+        toast.error("Status Update Blocked", res.error || "Could not update status");
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to update status");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      const res = await deleteProduct(confirmDeleteId);
+      if (res.success) {
+        toast.success("Product Deleted", "Draft product removed");
+        fetchProducts();
+      } else {
+        toast.error("Delete Blocked", res.error || "Cannot delete this product");
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to delete product");
+    } finally {
+      setConfirmDeleteId(null);
+    }
+  };
+
+  // ─── BULK ACTIONS ────────────────────────────────────────────────────────
+  const handleBulkStatus = async (action: "ACTIVATE" | "DEACTIVATE" | "ARCHIVE") => {
+    try {
+      const res = await bulkUpdateStatus(selectedIds, action);
+      if (res.success) {
+        toast.success("Bulk Action Complete", res.message);
+        setSelectedIds([]);
+        fetchProducts();
+      } else {
+        toast.error("Bulk Action Failed", res.error || "Could not complete bulk update");
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to run bulk status update");
+    }
+  };
+
+  const handleBulkCategoryChange = async () => {
+    if (!bulkTargetCategory) return;
+    try {
+      const res = await bulkChangeCategory(selectedIds, bulkTargetCategory);
+      if (res.success) {
+        toast.success("Categories Updated", res.message);
+        setSelectedIds([]);
+        setIsCategoryModalOpen(false);
+        fetchProducts();
+      } else {
+        toast.error("Update Failed", res.error || "Could not update category");
+      }
+    } catch (err: any) {
+      toast.error("Error", "Failed to update category");
+    }
+  };
+
+  // ─── SAVED VIEWS ACTIONS ─────────────────────────────────────────────────
+  const handleSaveCurrentView = async () => {
+    if (!newViewName.trim()) return;
+    const filterSnapshot = {
+      searchQuery,
+      statusTab,
+      selectedCategory,
+      selectedBrand,
+      selectedStock,
+    };
+
+    const res = await saveProductView(newViewName.trim(), filterSnapshot);
     if (res.success) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isAvailable: !currentStatus } : p))
-      );
-      setSuccessMsg("Product availability updated successfully!");
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } else {
-      setError(res.error || "Failed to update availability status");
+      toast.success("View Saved", `Saved filter preset "${newViewName}"`);
+      setNewViewName("");
+      setIsSavedViewModalOpen(false);
+      loadSavedViews();
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product? All its variants will be deleted too.")) return;
-
-    setError(null);
-    setSuccessMsg(null);
-    const res = await deleteProduct(id);
-    if (res.success) {
-      setSuccessMsg("Product deleted successfully!");
-      fetchProducts();
-    } else {
-      setError(res.error || "Failed to delete product");
+  const handleApplySavedView = (view: any) => {
+    try {
+      const filters = JSON.parse(view.filters);
+      setSearchQuery(filters.searchQuery || "");
+      setStatusTab(filters.statusTab || "ALL");
+      setSelectedCategory(filters.selectedCategory || "ALL");
+      setSelectedBrand(filters.selectedBrand || "ALL");
+      setSelectedStock(filters.selectedStock || "ALL");
+      setPage(1);
+      setIsSavedViewsDropdownOpen(false);
+      toast.info("Filter Applied", `Loaded view "${view.name}"`);
+    } catch (e) {
+      toast.error("Error", "Failed to parse saved view");
     }
   };
 
-  // Extract all categories for filtering
-  const categories = Array.from(new Set(products.map((p) => p.category.name)));
+  // ─── CSV EXPORT ──────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const params = new URLSearchParams();
+    if (statusTab !== "ALL") params.set("status", statusTab);
+    if (selectedCategory !== "ALL") params.set("categoryId", selectedCategory);
+    if (selectedBrand !== "ALL") params.set("brandId", selectedBrand);
+    if (searchQuery) params.set("search", searchQuery);
+    window.location.href = `/api/admin/export?${params.toString()}`;
+  };
 
-  const filteredProducts = products.filter((prod) => {
-    const matchesSearch =
-      prod.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      prod.variants.some((v) => v.sku && v.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesCategory =
-      selectedCategory === "ALL" || prod.category.name === selectedCategory;
-
-    const totalStock = prod.variants.reduce((acc, v) => acc + v.stock, 0);
-    const matchesStock =
-      selectedStock === "ALL" ||
-      (selectedStock === "INSTOCK" && (totalStock > 0 || prod.stockMode === "VIRTUAL")) ||
-      (selectedStock === "OUTOFSTOCK" && totalStock <= 0 && prod.stockMode === "TRACKED");
-
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+  const isAllOnPageSelected =
+    products.length > 0 && products.every((p) => selectedIds.includes(p.id));
 
   return (
-    <div className="font-sans space-y-6">
-      {/* Top action bar */}
-      <div className="flex justify-end mb-4">
-        <Link
-          href="/admin/products/new"
-          className="inline-flex items-center gap-2 bg-[#0F172A] hover:bg-[#1E293B] text-white py-2.5 px-4 rounded-[4px] font-semibold text-sm cursor-pointer transition-colors"
-        >
-          <Plus size={16} />
-          Add Product
-        </Link>
+    <div className="space-y-6 pb-20">
+      {/* ─── PAGE HEADER (S1) ────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-[var(--text-2xl)] font-bold text-[var(--color-fg)]">
+            Products
+          </h1>
+          <p className="text-[var(--text-xs)] text-[var(--color-fg-muted)] mt-1">
+            {counts.all.toLocaleString()} products · {counts.active.toLocaleString()} active ·{" "}
+            {counts.draft.toLocaleString()} drafts
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] text-[var(--color-fg)] text-[var(--text-xs)] font-medium flex items-center gap-1.5 transition-colors"
+          >
+            <Download size={14} /> Export CSV
+          </button>
+
+          <Link
+            href="/admin/products/import"
+            className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] text-[var(--color-fg)] text-[var(--text-xs)] font-medium flex items-center gap-1.5 transition-colors"
+          >
+            <Upload size={14} /> Import CSV
+          </Link>
+
+          <Link
+            href="/admin/products/new"
+            className="h-9 px-3.5 rounded-[var(--radius-md)] bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-[var(--text-xs)] font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <Plus size={15} /> Add Product
+          </Link>
+        </div>
       </div>
 
-      {/* Notifications */}
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-[6px] flex items-center gap-2">
-          <AlertCircle size={18} />
-          <span className="text-sm font-semibold">{error}</span>
-        </div>
-      )}
-      {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-[6px] flex items-center gap-2">
-          <Check size={18} />
-          <span className="text-sm font-semibold">{successMsg}</span>
-        </div>
-      )}
+      {/* ─── STATUS TABS (LIVE COUNTS) ────────────────────────────────────── */}
+      <div className="flex border-b border-[var(--color-border)] overflow-x-auto gap-1 text-[var(--text-xs)] font-medium">
+        {[
+          { id: "ALL", label: "All", count: counts.all },
+          { id: "ACTIVE", label: "Active", count: counts.active },
+          { id: "DRAFT", label: "Draft", count: counts.draft },
+          { id: "INACTIVE", label: "Inactive", count: counts.inactive },
+          { id: "ARCHIVED", label: "Archived", count: counts.archived },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => {
+              setStatusTab(tab.id as any);
+              setPage(1);
+            }}
+            className={`px-4 py-2.5 border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+              statusTab === tab.id
+                ? "border-[var(--color-primary)] text-[var(--color-primary)] font-bold"
+                : "border-transparent text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:border-[var(--color-border)]"
+            }`}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                statusTab === tab.id
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-[var(--color-surface-sunken)] text-[var(--color-fg-muted)]"
+              }`}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      {/* Toolbar / Filters */}
-      <div className="glass-card p-4 flex flex-col md:flex-row items-center gap-4 justify-between">
-        {/* Search */}
-        <div className="relative w-full md:max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-450" />
+      {/* ─── TOOLBAR & FILTERS ────────────────────────────────────────────── */}
+      <div className="bg-[var(--color-surface)] p-3.5 rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-2xs flex flex-wrap items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search
+            size={16}
+            className="absolute left-3 top-2.5 text-[var(--color-fg-muted)]"
+          />
           <input
             type="text"
-            placeholder="Search products by title, SKU..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] pl-9 pr-3 py-2 text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#EA580C] focus:ring-0"
+            placeholder="Search name, SKU, or slug..."
+            className="w-full h-9 pl-9 pr-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg)] text-[var(--text-xs)] focus:ring-2 focus:ring-[var(--color-primary)]"
           />
         </div>
 
-        {/* Dropdowns */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        {/* Filter Dropdowns */}
+        <div className="flex flex-wrap items-center gap-2">
           {/* Category Filter */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs font-semibold text-[#475569] focus:outline-none focus:border-[#EA580C] cursor-pointer"
+            className="h-9 px-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--text-xs)] text-[var(--color-fg)] font-medium"
           >
             <option value="ALL">All Categories</option>
             {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Brand Filter */}
+          <select
+            value={selectedBrand}
+            onChange={(e) => setSelectedBrand(e.target.value)}
+            className="h-9 px-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--text-xs)] text-[var(--color-fg)] font-medium"
+          >
+            <option value="ALL">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
               </option>
             ))}
           </select>
@@ -188,180 +442,314 @@ export default function ProductsPage() {
           <select
             value={selectedStock}
             onChange={(e) => setSelectedStock(e.target.value as any)}
-            className="bg-white border border-[#cbd5e1] rounded-[6px] px-3 py-1.5 text-xs font-semibold text-[#475569] focus:outline-none focus:border-[#EA580C] cursor-pointer"
+            className="h-9 px-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--text-xs)] text-[var(--color-fg)] font-medium"
           >
-            <option value="ALL">All Stock Status</option>
-            <option value="INSTOCK">In Stock / Virtual</option>
-            <option value="OUTOFSTOCK">Out of Stock</option>
+            <option value="ALL">Stock: All</option>
+            <option value="IN_STOCK">In Stock (&gt;10)</option>
+            <option value="LOW_STOCK">Low Stock (≤10)</option>
+            <option value="OUT_OF_STOCK">Out of Stock (0)</option>
           </select>
+
+          {/* Saved Views Menu */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsSavedViewsDropdownOpen(!isSavedViewsDropdownOpen)}
+              className="h-9 px-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-hover)] text-[var(--text-xs)] font-medium flex items-center gap-1"
+            >
+              <Bookmark size={13} />
+              Saved views
+              <ChevronDown size={13} />
+            </button>
+
+            {isSavedViewsDropdownOpen && (
+              <div className="absolute right-0 top-10 w-48 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] shadow-lg py-1 z-20 text-[var(--text-xs)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSavedViewModalOpen(true);
+                    setIsSavedViewsDropdownOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-surface-hover)] font-medium text-[var(--color-primary)] flex items-center gap-1.5"
+                >
+                  <Plus size={12} /> Save current view
+                </button>
+                <div className="border-t border-[var(--color-border-subtle)] my-1" />
+                {savedViews.length === 0 ? (
+                  <span className="block px-3 py-1.5 text-[var(--color-fg-muted)]">
+                    No saved views
+                  </span>
+                ) : (
+                  savedViews.map((v) => (
+                    <div
+                      key={v.id}
+                      className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                    >
+                      <span onClick={() => handleApplySavedView(v)} className="flex-1 truncate">
+                        {v.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await deleteSavedView(v.id);
+                          loadSavedViews();
+                        }}
+                        className="text-[var(--color-fg-muted)] hover:text-[var(--color-danger)] p-0.5"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Catalog Table */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
-          <Loader2 size={32} className="animate-spin text-[#EA580C]" />
-          <span>Loading products...</span>
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="glass-card p-12 text-center text-slate-450">
-          <Package size={48} className="mx-auto text-slate-350 mb-3" />
-          <p className="text-sm font-semibold text-[#0F172A]">No products found</p>
-          <p className="text-xs text-slate-500 mt-1">Get started by creating your first product.</p>
-        </div>
-      ) : (
-        <div className="glass-card overflow-hidden border border-[#E2E8F0]">
+      {/* ─── DATA TABLE (S1) ──────────────────────────────────────────────── */}
+      <div className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] overflow-hidden shadow-2xs">
+        {loading ? (
+          <div className="p-12 flex flex-col items-center justify-center gap-3 text-[var(--color-fg-muted)]">
+            <Loader2 size={28} className="animate-spin text-[var(--color-primary)]" />
+            <span className="text-[var(--text-xs)] font-medium">Loading catalog...</span>
+          </div>
+        ) : products.length === 0 ? (
+          /* Empty States */
+          <div className="p-16 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-[var(--color-surface-sunken)] flex items-center justify-center mx-auto text-[var(--color-fg-muted)]">
+              <Package size={24} />
+            </div>
+            {searchQuery || selectedCategory !== "ALL" || selectedBrand !== "ALL" || selectedStock !== "ALL" ? (
+              <>
+                <h3 className="text-[var(--text-md)] font-bold text-[var(--color-fg)]">
+                  No products match these filters
+                </h3>
+                <p className="text-[var(--text-xs)] text-[var(--color-fg-muted)] max-w-sm mx-auto">
+                  Try adjusting search keywords or clearing active dropdown filters.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedCategory("ALL");
+                    setSelectedBrand("ALL");
+                    setSelectedStock("ALL");
+                  }}
+                  className="px-3.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-hover)] text-[var(--text-xs)] font-medium"
+                >
+                  Clear filters
+                </button>
+              </>
+            ) : statusTab === "DRAFT" ? (
+              <>
+                <h3 className="text-[var(--text-md)] font-bold text-[var(--color-fg)]">
+                  No drafts
+                </h3>
+                <p className="text-[var(--text-xs)] text-[var(--color-fg-muted)] max-w-sm mx-auto">
+                  Products you start but don't publish will appear here.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-[var(--text-md)] font-bold text-[var(--color-fg)]">
+                  No products yet
+                </h3>
+                <p className="text-[var(--text-xs)] text-[var(--color-fg-muted)] max-w-sm mx-auto">
+                  Add your first product to start selling across Vaishnavi Enterprises storefront.
+                </p>
+                <Link
+                  href="/admin/products/new"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-[var(--text-xs)] font-bold"
+                >
+                  <Plus size={14} /> Add Product
+                </Link>
+              </>
+            )}
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] font-bold text-[#475569] tracking-wider uppercase">
-                  <th className="px-6 py-3.5">Product Info</th>
-                  <th className="px-6 py-3.5">Category / Brand</th>
-                  <th className="px-6 py-3.5">Price</th>
-                  <th className="px-6 py-3.5">Inventory</th>
-                  <th className="px-6 py-3.5">Checkout</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+            <table className="w-full text-left text-[var(--text-xs)] border-collapse">
+              <thead className="bg-[var(--color-surface-sunken)] text-[var(--color-fg-muted)] border-b border-[var(--color-border)] uppercase tracking-wider font-semibold">
+                <tr>
+                  <th className="p-3.5 w-10 text-center">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="p-1 hover:text-[var(--color-fg)]"
+                    >
+                      {isAllOnPageSelected ? (
+                        <CheckSquare size={16} className="text-[var(--color-primary)]" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3.5 w-14">Image</th>
+                  <th className="p-3.5 min-w-[220px]">Name</th>
+                  <th className="p-3.5">SKU</th>
+                  <th className="p-3.5">Brand</th>
+                  <th className="p-3.5 text-right">Price</th>
+                  <th className="p-3.5">Stock</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right w-24">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E2E8F0] bg-white">
-                {filteredProducts.map((prod) => {
-                  const mainImageObj = prod.images.find((img) => img.isMain) || prod.images[0];
-                  const imageUrl = mainImageObj?.image?.url || "";
-                  const totalStock = prod.variants.reduce((acc, v) => acc + v.stock, 0);
-                  const skus = prod.variants
-                    .map((v) => v.sku)
-                    .filter(Boolean)
-                    .slice(0, 2);
+              <tbody className="divide-y divide-[var(--color-border-subtle)] bg-[var(--color-surface)]">
+                {products.map((p) => {
+                  const isSelected = selectedIds.includes(p.id);
+                  const isMulti = p.variants && p.variants.length > 1;
+
+                  // Price calculation
+                  const activeVars = (p.variants || []).filter((v: any) => v.isActive !== false);
+                  const prices = activeVars.map((v: any) => Number(v.price) || 0).filter((pr: number) => pr > 0);
+                  const minP = prices.length > 0 ? Math.min(...prices) : p.basePrice;
+                  const maxP = prices.length > 0 ? Math.max(...prices) : p.basePrice;
+                  const priceLabel =
+                    minP === maxP ? formatINR(minP) : `${formatINR(minP)} – ${formatINR(maxP)}`;
+
+                  // Stock calculation
+                  const totalStock = activeVars.reduce((sum: number, v: any) => sum + (v.stock || 0), 0);
+                  const oosCount = activeVars.filter((v: any) => (v.stock || 0) === 0).length;
+
+                  // Thumbnail
+                  const mainImage = p.images?.find((img: any) => img.isMain) || p.images?.[0];
 
                   return (
                     <tr
-                      key={prod.id}
-                      className="hover:bg-slate-50 transition-colors"
+                      key={p.id}
+                      onClick={() => handleOpenQuickView(p)}
+                      className={`hover:bg-[var(--color-surface-hover)] cursor-pointer transition-colors ${
+                        isSelected ? "bg-[var(--color-primary-subtle)]/40" : ""
+                      }`}
                     >
-                      {/* Image + Title */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-[6px] bg-[#F8FAFC] border border-[#E2E8F0] flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={imageUrl}
-                                alt={prod.title}
-                                className="object-contain w-full h-full p-1"
-                              />
-                            ) : (
-                              <Package size={20} className="text-slate-350" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-[#0F172A] truncate max-w-xs" title={prod.title}>
-                              {prod.title}
-                            </p>
-                            <p className="text-[10px] text-[#64748B] font-mono mt-0.5 truncate max-w-xs">
-                              {skus.length > 0
-                                ? `SKU: ${skus.join(", ")}${prod.variants.length > 2 ? "..." : ""}`
-                                : "No SKUs"}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Category & Brand */}
-                      <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-[#0F172A]">
-                          {prod.category.name}
-                        </p>
-                        <p className="text-[10px] text-[#64748B] mt-0.5 font-medium">
-                          Brand: {prod.brand?.name || "Generic"}
-                        </p>
-                      </td>
-
-                      {/* Base Price */}
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-bold text-[#EA580C]">
-                          {formatINR(prod.basePrice)}
-                        </span>
-                        {prod.variants.length > 1 && (
-                          <p className="text-[9px] text-[#64748B] mt-0.5">
-                            {prod.variants.length} pricing tiers
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Inventory / Stock */}
-                      <td className="px-6 py-4">
-                        {prod.stockMode === "TRACKED" ? (
-                          <span
-                            className={`text-xs font-bold ${
-                              totalStock <= 0
-                                ? "text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-[4px]"
-                                : totalStock <= 5
-                                ? "text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-[4px]"
-                                : "text-[#475569]"
-                            }`}
-                          >
-                            {totalStock <= 0 ? "Out of Stock" : `${totalStock} units`}
-                          </span>
-                        ) : prod.stockMode === "VIRTUAL" ? (
-                          <span className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-[4px] border border-blue-100 font-bold">
-                            Virtual (Unlimited)
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">Inquire Mode</span>
-                        )}
-                      </td>
-
-                      {/* Checkout Mode */}
-                      <td className="px-6 py-4">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            prod.checkoutMode === "BUY"
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-100"
-                              : "bg-blue-50 text-blue-800 border-blue-100"
-                          }`}
-                        >
-                          {prod.checkoutMode}
-                        </span>
-                      </td>
-
-                      {/* Availability Status */}
-                      <td className="px-6 py-4">
+                      {/* Select Checkbox */}
+                      <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => handleToggleStatus(prod.id, prod.isAvailable)}
-                          className="focus:outline-none flex items-center cursor-pointer"
-                          title="Click to toggle availability"
+                          type="button"
+                          onClick={(e) => toggleSelectOne(p.id, e)}
+                          className="p-1 hover:text-[var(--color-fg)]"
                         >
-                          {prod.isAvailable ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                              <Eye size={10} />
-                              Available
-                            </span>
+                          {isSelected ? (
+                            <CheckSquare size={16} className="text-[var(--color-primary)]" />
                           ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                              <EyeOff size={10} />
-                              Hidden
-                            </span>
+                            <Square size={16} />
                           )}
                         </button>
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      {/* Image Thumbnail */}
+                      <td className="p-3.5">
+                        <div className="w-10 h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface-sunken)] flex-shrink-0">
+                          {mainImage?.image?.url ? (
+                            <Image
+                              src={mainImage.image.url}
+                              alt={p.title}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[var(--color-fg-muted)]">
+                              <Package size={16} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Product Name & Category Breadcrumb */}
+                      <td className="p-3.5">
+                        <Link
+                          href={`/admin/products/${p.id}/edit`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-semibold text-[var(--color-fg)] hover:text-[var(--color-primary)] line-clamp-1"
+                        >
+                          {p.title}
+                        </Link>
+                        <span className="text-[11px] text-[var(--color-fg-muted)] line-clamp-1 mt-0.5">
+                          {p.category?.name || "Uncategorized"}
+                        </span>
+                      </td>
+
+                      {/* SKU */}
+                      <td className="p-3.5">
+                        {isMulti ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenQuickView(p, e)}
+                            className="font-mono text-[11px] text-[var(--color-primary)] hover:underline font-bold"
+                          >
+                            {p.variants.length} SKUs
+                          </button>
+                        ) : (
+                          <span className="font-mono text-[11px] text-[var(--color-fg-muted)]">
+                            {p.variants?.[0]?.sku || "—"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Brand */}
+                      <td className="p-3.5 font-medium text-[var(--color-fg-muted)]">
+                        {p.brand?.name || "—"}
+                      </td>
+
+                      {/* Price */}
+                      <td className="p-3.5 text-right font-mono font-bold text-[var(--color-fg)]">
+                        {priceLabel}
+                      </td>
+
+                      {/* Stock Health */}
+                      <td className="p-3.5">
+                        {totalStock === 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">
+                            Out of stock
+                          </span>
+                        ) : isMulti && oosCount > 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                            {oosCount} of {p.variants.length} out
+                          </span>
+                        ) : totalStock <= 10 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                            {totalStock} low
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                            {totalStock} in stock
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-3.5">
+                        <StatusBadge status={p.status} />
+                      </td>
+
+                      {/* Row Actions Menu */}
+                      <td className="p-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenQuickView(p, e)}
+                            title="Quick View (Space / Click)"
+                            className="p-1 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-surface-hover)]"
+                          >
+                            <Eye size={14} />
+                          </button>
                           <Link
-                            href={`/admin/products/${prod.id}/edit`}
-                            className="p-1.5 rounded-[4px] border border-[#E2E8F0] hover:border-[#EA580C]/35 text-[#475569] hover:text-[#0F172A] transition-colors inline-block"
+                            href={`/admin/products/${p.id}/edit`}
                             title="Edit Product"
+                            className="p-1 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-surface-hover)]"
                           >
                             <Edit size={14} />
                           </Link>
                           <button
-                            onClick={() => handleDelete(prod.id)}
-                            className="p-1.5 rounded-[4px] border border-rose-100 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="Delete Product"
+                            type="button"
+                            onClick={(e) => handleDuplicate(p.id, e)}
+                            title="Duplicate Product"
+                            className="p-1 rounded text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] hover:bg-[var(--color-surface-hover)]"
                           >
-                            <Trash2 size={14} />
+                            <Copy size={14} />
                           </button>
                         </div>
                       </td>
@@ -371,8 +759,213 @@ export default function ProductsPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="p-3.5 border-t border-[var(--color-border)] bg-[var(--color-surface-sunken)] flex items-center justify-between text-[var(--text-xs)]">
+            <span className="text-[var(--color-fg-muted)]">
+              Showing page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount} total)
+            </span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                className="px-3 py-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                className="px-3 py-1.5 rounded border border-[var(--color-border)] bg-[var(--color-surface)] disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── BULK ACTION BAR (FIXED BOTTOM FLOATER) ───────────────────────── */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 inset-x-0 mx-auto max-w-2xl z-40 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-2xl rounded-[var(--radius-lg)] p-3 px-5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-[var(--color-primary)] text-white text-[11px] font-bold">
+              {selectedIds.length}
+            </span>
+            <span className="text-[var(--text-sm)] font-bold text-[var(--color-fg)]">
+              selected
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 text-[var(--text-xs)]">
+            <button
+              type="button"
+              onClick={() => handleBulkStatus("ACTIVATE")}
+              className="px-3 py-1.5 rounded-md bg-[var(--color-success)] text-white font-bold hover:opacity-90 transition-opacity"
+            >
+              Activate
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkStatus("DEACTIVATE")}
+              className="px-3 py-1.5 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] font-medium text-[var(--color-fg)]"
+            >
+              Deactivate
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkStatus("ARCHIVE")}
+              className="px-3 py-1.5 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] font-medium text-[var(--color-fg)]"
+            >
+              Archive
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3 py-1.5 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] font-medium text-[var(--color-fg)]"
+            >
+              Change category
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPriceAdjustModalOpen(true)}
+              className="px-3 py-1.5 rounded-md bg-[var(--color-primary)] text-white font-bold hover:bg-[var(--color-primary-hover)] flex items-center gap-1"
+            >
+              <DollarSign size={13} /> Adjust price
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="px-2.5 py-1.5 rounded-md text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
+
+      {/* ─── QUICK VIEW DRAWER (S3) ───────────────────────────────────────── */}
+      <ProductQuickViewDrawer
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+        product={quickViewProduct}
+        allProducts={products}
+        onNavigateProduct={(next) => setQuickViewProduct(next)}
+        onRefresh={fetchProducts}
+      />
+
+      {/* ─── BULK PRICE ADJUST MODAL (S4) ─────────────────────────────────── */}
+      <BulkPriceAdjustModal
+        isOpen={isPriceAdjustModalOpen}
+        onClose={() => setIsPriceAdjustModalOpen(false)}
+        selectedProductIds={selectedIds}
+        onSuccess={() => {
+          setSelectedIds([]);
+          fetchProducts();
+        }}
+      />
+
+      {/* ─── MODAL: BULK CHANGE CATEGORY ──────────────────────────────────── */}
+      <Modal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        title={`Change Category for ${selectedIds.length} Products`}
+        subtitle="Non-shared category attributes will be cleared from affected items."
+        maxWidth="sm"
+      >
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-[var(--text-sm)] font-semibold text-[var(--color-fg)] mb-1 block">
+              Target Category
+            </label>
+            <select
+              value={bulkTargetCategory}
+              onChange={(e) => setBulkTargetCategory(e.target.value)}
+              className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg)] text-[var(--text-sm)]"
+            >
+              <option value="">Select target category...</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(false)}
+              className="px-3 py-1.5 rounded text-[var(--text-sm)] font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!bulkTargetCategory}
+              onClick={handleBulkCategoryChange}
+              className="px-4 py-2 rounded bg-[var(--color-primary)] text-white text-[var(--text-sm)] font-bold disabled:opacity-50"
+            >
+              Apply Category Change
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─── MODAL: SAVE VIEW ─────────────────────────────────────────────── */}
+      <Modal
+        isOpen={isSavedViewModalOpen}
+        onClose={() => setIsSavedViewModalOpen(false)}
+        title="Save Current View"
+        subtitle="Save this filter and search configuration for 1-click recall."
+        maxWidth="sm"
+      >
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-[var(--text-sm)] font-semibold text-[var(--color-fg)] mb-1 block">
+              View Name
+            </label>
+            <input
+              type="text"
+              value={newViewName}
+              onChange={(e) => setNewViewName(e.target.value)}
+              placeholder="e.g. Out of stock solar panels, Drafts this week"
+              className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg)] text-[var(--text-sm)]"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsSavedViewModalOpen(false)}
+              className="px-3 py-1.5 rounded text-[var(--text-sm)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveCurrentView}
+              disabled={!newViewName.trim()}
+              className="px-4 py-2 rounded bg-[var(--color-primary)] text-white text-[var(--text-sm)] font-bold disabled:opacity-50"
+            >
+              Save View
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─── CONFIRM DELETE DRAFT MODAL ───────────────────────────────────── */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteId)}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Delete Draft Product?"
+        message="This product has no order history and will be removed permanently. This action cannot be undone."
+        confirmLabel="Delete Draft"
+        variant="danger"
+      />
     </div>
   );
 }

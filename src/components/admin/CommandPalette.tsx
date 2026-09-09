@@ -15,6 +15,7 @@ import {
   CreditCard,
   History,
   FileText,
+  Scale,
   X,
   ArrowRight,
   LucideIcon,
@@ -47,6 +48,7 @@ const STATIC_COMMANDS: CommandItem[] = [
   { id: "nav-payments", category: "Orders", title: "Payments & Invoices", href: "/admin/payments", icon: CreditCard, keywords: ["money", "refunds", "transactions"] },
   { id: "nav-shipments", category: "Orders", title: "Shipments & Delivery", href: "/admin/shipments", icon: Truck, keywords: ["logistics", "courier", "awb"] },
   { id: "nav-tax", category: "System", title: "Tax & HSN Configuration", href: "/admin/tax", icon: FileText, keywords: ["gst", "rates", "hsn code"] },
+  { id: "nav-units", category: "Catalog", title: "Units of Measure", href: "/admin/units", icon: Scale, keywords: ["uom", "piece", "kg", "units", "precision"] },
   { id: "nav-audit", category: "System", title: "Audit Log Trail", href: "/admin/audit", icon: History, keywords: ["security", "changes", "history"] },
   { id: "nav-settings", category: "System", title: "Store Settings", href: "/admin/settings", icon: Settings, keywords: ["config", "admin"] },
 ];

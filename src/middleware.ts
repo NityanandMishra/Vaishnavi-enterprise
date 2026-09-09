@@ -5,6 +5,18 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // ── Config URL aliases (/config/... -> /admin/...) ───────────────────────
+  if (pathname.startsWith("/config/units")) {
+    const targetUrl = new URL(pathname.replace("/config/units", "/admin/units"), req.url);
+    targetUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(targetUrl);
+  }
+  if (pathname.startsWith("/config/tax")) {
+    const targetUrl = new URL(pathname.replace("/config/tax", "/admin/tax"), req.url);
+    targetUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(targetUrl);
+  }
+
   // ── Admin route protection ──────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
     const token = await getToken({
@@ -21,7 +33,8 @@ export async function middleware(req: NextRequest) {
 
     // Logged in but not an admin role → redirect to customer account
     const role = token.role as string | undefined;
-    if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER") {
+    const adminRoles = ["ADMIN", "SUPER_ADMIN", "CATALOG_MANAGER", "FINANCE", "OPS_EXECUTIVE"];
+    if (!role || !adminRoles.includes(role)) {
       return NextResponse.redirect(new URL("/account", req.url));
     }
   }
@@ -44,5 +57,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*"],
+  matcher: ["/admin/:path*", "/config/:path*", "/account/:path*", "/checkout/:path*"],
 };

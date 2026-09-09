@@ -12,7 +12,13 @@ export interface InvoiceItem {
   variantTitle?: string | null;
   hsnCode?: string | null;
   quantity: number;
-  price: number; // inclusive of GST
+  price: number;
+  taxableValue?: number;
+  gstRate?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  cessAmount?: number;
 }
 
 export interface InvoiceData {
@@ -55,6 +61,12 @@ export interface InvoiceData {
   shippingCost: number;
   gstAmount: number;
   totalAmount: number;
+
+  cgstTotal?: number;
+  sgstTotal?: number;
+  igstTotal?: number;
+  cessTotal?: number;
+  taxableValueTotal?: number;
 }
 
 export default function InvoiceView({
@@ -68,15 +80,71 @@ export default function InvoiceView({
     window.print();
   }
 
-  // Calculate tax breakdown (assuming standard 18% GST: 9% CGST + 9% SGST for intra-state UP)
-  const isIntraState =
-    invoice.buyer.state.toLowerCase().includes("uttar pradesh") ||
-    invoice.buyer.state.toLowerCase() === "up";
+  // Determine intra-state vs inter-state
+  const itemsWithTaxes = invoice.items.some(
+    (i) => (i.cgstAmount ?? 0) > 0 || (i.sgstAmount ?? 0) > 0 || (i.igstAmount ?? 0) > 0
+  );
 
-  const taxableValue = invoice.subtotal - invoice.discountAmount;
-  const cgst = isIntraState ? invoice.gstAmount / 2 : 0;
-  const sgst = isIntraState ? invoice.gstAmount / 2 : 0;
-  const igst = !isIntraState ? invoice.gstAmount : 0;
+  const snapshotCgst = invoice.cgstTotal ?? invoice.items.reduce((s, i) => s + (i.cgstAmount ?? 0), 0);
+  const snapshotSgst = invoice.sgstTotal ?? invoice.items.reduce((s, i) => s + (i.sgstAmount ?? 0), 0);
+  const snapshotIgst = invoice.igstTotal ?? invoice.items.reduce((s, i) => s + (i.igstAmount ?? 0), 0);
+  const snapshotCess = invoice.cessTotal ?? invoice.items.reduce((s, i) => s + (i.cessAmount ?? 0), 0);
+  const snapshotTaxable = invoice.taxableValueTotal ?? invoice.items.reduce((s, i) => s + (i.taxableValue ?? 0), 0);
+
+  const isIntraState = itemsWithTaxes
+    ? snapshotIgst === 0 && (snapshotCgst > 0 || snapshotSgst > 0)
+    : invoice.buyer.state.toLowerCase().includes("uttar pradesh") ||
+      invoice.buyer.state.toLowerCase() === "up" ||
+      invoice.buyer.state.toLowerCase().includes("maharashtra") ||
+      invoice.buyer.state.toLowerCase() === "mh";
+
+  const taxableValue = snapshotTaxable > 0 ? snapshotTaxable : invoice.subtotal - invoice.discountAmount;
+  const cgst = itemsWithTaxes ? snapshotCgst : isIntraState ? invoice.gstAmount / 2 : 0;
+  const sgst = itemsWithTaxes ? snapshotSgst : isIntraState ? invoice.gstAmount / 2 : 0;
+  const igst = itemsWithTaxes ? snapshotIgst : !isIntraState ? invoice.gstAmount : 0;
+  const cess = snapshotCess;
+
+  // HSN Tax Summary Grouping
+  const hsnGroups = React.useMemo(() => {
+    const map = new Map<
+      string,
+      { hsn: string; taxable: number; rate: number; cgst: number; sgst: number; igst: number; cess: number; totalTax: number }
+    >();
+
+    for (const item of invoice.items) {
+      const code = item.hsnCode || "8536";
+      const itemTaxable = item.taxableValue ?? (item.price * item.quantity);
+      const itemCgst = item.cgstAmount ?? 0;
+      const itemSgst = item.sgstAmount ?? 0;
+      const itemIgst = item.igstAmount ?? 0;
+      const itemCess = item.cessAmount ?? 0;
+      const itemRate = item.gstRate ?? (itemsWithTaxes ? 0 : 18);
+      const itemTotalTax = itemCgst + itemSgst + itemIgst + itemCess;
+
+      if (!map.has(code)) {
+        map.set(code, {
+          hsn: code,
+          taxable: itemTaxable,
+          rate: itemRate,
+          cgst: itemCgst,
+          sgst: itemSgst,
+          igst: itemIgst,
+          cess: itemCess,
+          totalTax: itemTotalTax,
+        });
+      } else {
+        const curr = map.get(code)!;
+        curr.taxable += itemTaxable;
+        curr.cgst += itemCgst;
+        curr.sgst += itemSgst;
+        curr.igst += itemIgst;
+        curr.cess += itemCess;
+        curr.totalTax += itemTotalTax;
+      }
+    }
+
+    return Array.from(map.values());
+  }, [invoice.items, itemsWithTaxes]);
 
   const formattedDate = new Date(invoice.orderDate).toLocaleDateString("en-IN", {
     dateStyle: "long",
@@ -196,32 +264,44 @@ export default function InvoiceView({
               <tr className="border-y-2 border-slate-900 bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
                 <th className="py-2.5 px-3">#</th>
                 <th className="py-2.5 px-3">Item Description</th>
-                <th className="py-2.5 px-3 text-center">HSN</th>
+                <th className="py-2.5 px-3 text-center">HSN/SAC</th>
                 <th className="py-2.5 px-3 text-center">Qty</th>
                 <th className="py-2.5 px-3 text-right">Unit Price</th>
+                <th className="py-2.5 px-3 text-right">Taxable</th>
+                <th className="py-2.5 px-3 text-right">Tax</th>
                 <th className="py-2.5 px-3 text-right">Total (INR)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {invoice.items.map((item, idx) => (
-                <tr key={item.id}>
-                  <td className="py-3 px-3 font-mono text-slate-500">{idx + 1}</td>
-                  <td className="py-3 px-3">
-                    <p className="font-semibold text-slate-900">{item.title}</p>
-                    {item.variantTitle && (
-                      <p className="text-slate-500 text-[11px]">Variant: {item.variantTitle}</p>
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-center font-mono text-slate-600">
-                    {item.hsnCode || "8541"}
-                  </td>
-                  <td className="py-3 px-3 text-center font-mono font-medium">{item.quantity}</td>
-                  <td className="py-3 px-3 text-right font-mono">{formatINR(item.price)}</td>
-                  <td className="py-3 px-3 text-right font-mono font-bold">
-                    {formatINR(item.price * item.quantity)}
-                  </td>
-                </tr>
-              ))}
+              {invoice.items.map((item, idx) => {
+                const itemTax = (item.cgstAmount ?? 0) + (item.sgstAmount ?? 0) + (item.igstAmount ?? 0) + (item.cessAmount ?? 0);
+                const itemTaxable = item.taxableValue ?? (item.price * item.quantity);
+                const itemTotal = itemTaxable + itemTax;
+
+                return (
+                  <tr key={item.id}>
+                    <td className="py-3 px-3 font-mono text-slate-500">{idx + 1}</td>
+                    <td className="py-3 px-3">
+                      <p className="font-semibold text-slate-900">{item.title}</p>
+                      {item.variantTitle && (
+                        <p className="text-slate-500 text-[11px]">Variant: {item.variantTitle}</p>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono text-slate-600">
+                      {item.hsnCode || "8536"}
+                    </td>
+                    <td className="py-3 px-3 text-center font-mono font-medium">{item.quantity}</td>
+                    <td className="py-3 px-3 text-right font-mono">{formatINR(item.price)}</td>
+                    <td className="py-3 px-3 text-right font-mono">{formatINR(itemTaxable)}</td>
+                    <td className="py-3 px-3 text-right font-mono">
+                      {itemTax > 0 ? formatINR(itemTax) : item.gstRate ? `${item.gstRate}%` : "—"}
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono font-bold">
+                      {formatINR(itemTotal > 0 ? itemTotal : item.price * item.quantity)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -235,6 +315,33 @@ export default function InvoiceView({
               <li>For service or warranty queries, contact Suriyawan head office.</li>
               <li>Subject to Bhadohi jurisdiction.</li>
             </ul>
+
+            {/* HSN Summary Breakdown (Rule 46) */}
+            {hsnGroups.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-slate-200">
+                <p className="font-bold text-slate-900 text-[11px] uppercase tracking-wider mb-1.5">
+                  HSN / SAC Summary:
+                </p>
+                <table className="w-full text-left border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="py-1">HSN</th>
+                      <th className="py-1 text-right">Taxable</th>
+                      <th className="py-1 text-right">Tax</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {hsnGroups.map((g) => (
+                      <tr key={g.hsn}>
+                        <td className="py-1">{g.hsn}</td>
+                        <td className="py-1 text-right">{formatINR(g.taxable)}</td>
+                        <td className="py-1 text-right">{formatINR(g.totalTax)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="w-full sm:w-72 space-y-1.5 text-xs">
@@ -253,18 +360,25 @@ export default function InvoiceView({
             {isIntraState ? (
               <>
                 <div className="flex justify-between py-1 border-b border-slate-100 text-slate-600">
-                  <span>CGST (9%)</span>
+                  <span>CGST</span>
                   <span className="font-mono">{formatINR(cgst)}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-100 text-slate-600">
-                  <span>SGST (9%)</span>
+                  <span>SGST</span>
                   <span className="font-mono">{formatINR(sgst)}</span>
                 </div>
               </>
             ) : (
               <div className="flex justify-between py-1 border-b border-slate-100 text-slate-600">
-                <span>IGST (18%)</span>
+                <span>IGST</span>
                 <span className="font-mono">{formatINR(igst)}</span>
+              </div>
+            )}
+
+            {cess > 0 && (
+              <div className="flex justify-between py-1 border-b border-slate-100 text-slate-600">
+                <span>CESS</span>
+                <span className="font-mono">{formatINR(cess)}</span>
               </div>
             )}
 

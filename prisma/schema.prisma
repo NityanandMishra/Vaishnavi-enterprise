@@ -158,6 +158,7 @@ model Category {
   children           Category[]          @relation("CategoryHierarchy")
   products           Product[]
   categoryAttributes CategoryAttribute[]
+  hsnMapping         CategoryHsnMapping?
 
   // No two categories may share the same name within the same parent scope
   @@unique([name, parentId])
@@ -168,28 +169,42 @@ model Category {
 // stockMode values: "TRACKED" | "VIRTUAL" | "INQUIRE"
 
 model Product {
-  id           String    @id @default(uuid())
-  title        String
-  description  String
-  basePrice    Float
-  checkoutMode String    // "BUY" | "INQUIRE"
-  stockMode    String    // "TRACKED" | "VIRTUAL" | "INQUIRE"
-  isAvailable  Boolean   @default(true)
-  categoryId   String
-  brandId      String?
-  sellerId     String?   // House seller record default, future multi-vendor (D-02)
-  hsnCode      String?   // Overrides Category HSN code (D-06)
-  gstRate      Float?    // Overrides Category GST % (D-06)
-  specs        String    @default("{}") // SQLite: stored as JSON string
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  id               String    @id @default(uuid())
+  title            String
+  slug             String?   @unique
+  description      String
+  shortDescription String?
+  basePrice        Float
+  checkoutMode     String    // "BUY" | "INQUIRE"
+  stockMode        String    // "TRACKED" | "VIRTUAL" | "INQUIRE"
+  status           String    @default("DRAFT") // "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED"
+  isAvailable      Boolean   @default(true)
+  categoryId       String
+  brandId          String?
+  unit             String?   @default("Piece")
+  unitId           String?
+  sellerId         String?   // House seller record default, future multi-vendor (D-02)
+  hsnCode          String?   // Overrides Category HSN code (D-06)
+  hsnId            String?
+  gstRate          Float?    // Overrides Category GST % (D-06)
+  specs            String    @default("{}") // SQLite: stored as JSON string
+  metaTitle        String?
+  metaDescription  String?
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
 
   category        Category                @relation(fields: [categoryId], references: [id])
   brand           Brand?                  @relation(fields: [brandId], references: [id])
+  unitRel         Unit?                   @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  hsnRel          HsnCode?                @relation(fields: [hsnId], references: [id], onDelete: SetNull)
   images          ProductImage[]
   variants        ProductVariant[]
   attributeValues ProductAttributeValue[]
+  drafts          ProductDraft[]
   wishlist        WishlistItem[]
   reviews         Review[]
   leads           Lead[]
@@ -205,6 +220,7 @@ model ProductImage {
   imageId   String
   sortOrder Int     @default(0)
   isMain    Boolean @default(false)
+  altText   String? // Per-product image alt text override
 
   product Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   image   MediaImage @relation(fields: [imageId], references: [id])
@@ -224,14 +240,66 @@ model ProductVariant {
   sku         String?   @unique
   color       String?
   size        String?
+  weightGrams Float?
+  lengthMm    Float?
+  widthMm     Float?
+  heightMm    Float?
+  isDefault   Boolean   @default(false)
+  position    Int       @default(0)
   isAvailable Boolean   @default(true)
   isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
   deletedAt   DateTime?
 
   product         Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
   attributeValues VariantAttributeValue[]
   cartItems       CartItem[]
   orderItems      OrderItem[]
+  inventories     Inventory[]
+  movements       InventoryMovement[]
+  stockAlerts     StockAlert[]
+}
+
+// ─── PRODUCT DRAFT (Autosave Storage) ────────────────────────────────────────
+
+model ProductDraft {
+  id        String   @id @default(uuid())
+  productId String?
+  userId    String?
+  payload   String   // JSON string snapshot of in-progress form
+  updatedAt DateTime @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([userId])
+}
+
+// ─── PRODUCT IMPORT BATCH (CSV Rollback) ─────────────────────────────────────
+
+model ProductImportBatch {
+  id           String    @id @default(uuid())
+  userId       String?
+  filename     String
+  totalRows    Int
+  createdCount Int
+  updatedCount Int
+  skippedCount Int
+  status       String    @default("COMPLETED") // "COMPLETED" | "REVERTED" | "FAILED"
+  snapshot     String?   // JSON snapshot for 24h rollback
+  createdAt    DateTime  @default(now())
+  revertedAt   DateTime?
+}
+
+// ─── SAVED PRODUCT VIEW (Filter Preset) ──────────────────────────────────────
+
+model SavedProductView {
+  id        String   @id @default(uuid())
+  userId    String?
+  name      String
+  filters   String   // JSON string of saved filters, sorts, columns
+  createdAt DateTime @default(now())
 }
 
 // ─── ATTRIBUTES & VARIANTS (EPIC-01: ATTR) ──────────────────────────────────
@@ -384,6 +452,13 @@ model OrderItem {
   variantTitle String? // Snapshot variant title (e.g. "1200mm Brown")
   quantity     Int
   price        Float   // Price at time of order (snapshot)
+  hsnCode      String? // Snapshot HSN code at order placement time
+  gstRate      Float?  // Snapshot GST % at order placement time
+  cgstAmount   Float?  @default(0) // Snapshot CGST amount
+  sgstAmount   Float?  @default(0) // Snapshot SGST amount
+  igstAmount   Float?  @default(0) // Snapshot IGST amount
+  cessAmount   Float?  @default(0) // Snapshot CESS amount
+  taxableValue Float?  // Snapshot per-line taxable value
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product         @relation(fields: [productId], references: [id])
@@ -487,4 +562,188 @@ model WishlistItem {
 
   @@unique([userId, productId, variantId])
 }
+
+// ─── UNIT OF MEASURE (EPIC-02: TAX-01) ───────────────────────────────────────
+// unitType values: "COUNT" | "WEIGHT" | "VOLUME" | "LENGTH" | "AREA"
+
+model Unit {
+  id               String    @id @default(uuid())
+  name             String    @unique
+  symbol           String    // e.g. "pcs", "kg", "m"
+  unitType         String    // "COUNT" | "WEIGHT" | "VOLUME" | "LENGTH" | "AREA"
+  decimalPrecision Int       @default(0) // 0 to 3
+  isActive         Boolean   @default(true)
+  isSystem         Boolean   @default(false) // Seeded units cannot be deleted
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  products Product[]
+}
+
+// ─── HSN CODE (EPIC-02: TAX-02, TAX-03) ──────────────────────────────────────
+// rateType values: "FLAT" | "SLAB"
+
+model HsnCode {
+  id          String    @id @default(uuid())
+  code        String    @unique // 4, 6, or 8 digits
+  description String
+  rateType    String    @default("FLAT") // "FLAT" | "SLAB"
+  cessRate    Float?    @default(0) // Additional CESS rate %
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  rateVersions     HsnRateVersion[]
+  categoryMappings CategoryHsnMapping[]
+  products         Product[]
+  defaultSettings  TaxSettings[]
+}
+
+// ─── HSN RATE VERSION (EPIC-02: TAX-07) ──────────────────────────────────────
+
+model HsnRateVersion {
+  id            String    @id @default(uuid())
+  hsnId         String
+  gstRate       Float?    // Flat rate % (e.g. 18.0). Null if rateType is SLAB
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdBy     String?   // User name or email
+  createdAt     DateTime  @default(now())
+
+  hsn   HsnCode        @relation(fields: [hsnId], references: [id], onDelete: Cascade)
+  slabs HsnPriceSlab[]
+
+  @@index([hsnId, effectiveFrom])
+}
+
+// ─── HSN PRICE SLAB (EPIC-02: TAX-03) ────────────────────────────────────────
+
+model HsnPriceSlab {
+  id            String @id @default(uuid())
+  rateVersionId String
+  minPrice      Float  // Stored in INR (e.g. 0.00, 1000.01)
+  maxPrice      Float? // Null = open-ended ("No limit")
+  gstRate       Float  // Rate % for this price slab
+
+  rateVersion HsnRateVersion @relation(fields: [rateVersionId], references: [id], onDelete: Cascade)
+
+  @@index([rateVersionId])
+}
+
+// ─── CATEGORY HSN MAPPING (EPIC-02: TAX-04) ─────────────────────────────────
+
+model CategoryHsnMapping {
+  id         String   @id @default(uuid())
+  categoryId String   @unique
+  hsnId      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  hsn      HsnCode  @relation(fields: [hsnId], references: [id], onDelete: Restrict)
+}
+
+// ─── TAX SETTINGS (EPIC-02: TAX-05) ─────────────────────────────────────────
+// pricingMode values: "EXCLUSIVE" | "INCLUSIVE"
+
+model TaxSettings {
+  id              String   @id @default(uuid())
+  sellerStateCode String   @default("27") // e.g. "27" Maharashtra
+  sellerGstin     String   @default("27AABCV1234K1Z5")
+  pricingMode     String   @default("EXCLUSIVE") // "EXCLUSIVE" | "INCLUSIVE"
+  defaultHsnId    String?
+  updatedAt       DateTime @updatedAt
+
+  defaultHsn HsnCode? @relation(fields: [defaultHsnId], references: [id], onDelete: SetNull)
+}
+
+// ─── LOCATION (EPIC-04: INV-12 Future Multi-location Scaffold) ───────────────
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String   // e.g. "Main Warehouse"
+  code      String   @unique // e.g. "MAIN"
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventories Inventory[]
+}
+
+// ─── INVENTORY (EPIC-04: INV-01 Stock Record) ────────────────────────────────
+
+model Inventory {
+  id                String    @id @default(uuid())
+  variantId         String
+  locationId        String
+  sellerId          String?   // House seller default (D-02)
+  onHand            Int       @default(0) // Physical units in building (must be >= 0)
+  reserved          Int       @default(0) // Committed to unfulfilled orders (must be >= 0)
+  lowStockThreshold Int?      @default(5) // Variant threshold, null/default = 5
+  backorderEnabled  Boolean   @default(false)
+  lastCountedAt     DateTime?
+  updatedAt         DateTime  @updatedAt
+  version           Int       @default(1)
+
+  variant   ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location  Location            @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  movements InventoryMovement[]
+
+  @@unique([variantId, locationId])
+  @@index([locationId])
+  @@index([variantId])
+}
+
+// ─── INVENTORY MOVEMENT (EPIC-04: THE IMMUTABLE LEDGER) ──────────────────────
+// movementType: "ADJUSTMENT" | "RESERVATION" | "RELEASE" | "FULFILMENT" | "RETURN"
+// reasonCode  : "PURCHASE" | "SALE" | "RETURN" | "DAMAGE" | "THEFT" | "CORRECTION" | "TRANSFER"
+// referenceType: "ORDER" | "ADJUSTMENT" | "IMPORT" | "RETURN" | "SHIPMENT"
+
+model InventoryMovement {
+  id            String   @id @default(uuid())
+  inventoryId   String
+  variantId     String
+  movementType  String   // "ADJUSTMENT" | "RESERVATION" | "RELEASE" | "FULFILMENT" | "RETURN"
+  reasonCode    String   // "PURCHASE" | "SALE" | "RETURN" | "DAMAGE" | "THEFT" | "CORRECTION" | "TRANSFER"
+  quantityDelta Int      // Signed integer
+  onHandAfter   Int
+  reservedAfter Int
+  referenceType String?  // "ORDER" | "ADJUSTMENT" | "IMPORT" | "RETURN" | "SHIPMENT"
+  referenceId   String?
+  note          String?
+  batchId       String?
+  createdBy     String?  // Actor ID or Name, or "System"
+  createdAt     DateTime @default(now())
+
+  // Append-only: strictly NO updatedAt, NO deletedAt.
+  inventory Inventory      @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, createdAt])
+  @@index([inventoryId, createdAt])
+  @@index([batchId])
+  @@index([referenceType, referenceId])
+}
+
+// ─── STOCK ALERT (EPIC-04: INV-07 Low-Stock Alerts) ──────────────────────────
+// alertType: "LOW_STOCK" | "OUT_OF_STOCK"
+
+model StockAlert {
+  id                 String    @id @default(uuid())
+  variantId          String
+  alertType          String    // "LOW_STOCK" | "OUT_OF_STOCK"
+  triggeredAt        DateTime  @default(now())
+  availableAtTrigger Int
+  resolvedAt         DateTime?
+  notifiedAt         DateTime?
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, resolvedAt])
+  @@index([alertType, resolvedAt])
+}
+
 

@@ -1,35 +1,36 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import InventoryManager, { VariantInventoryItem } from "@/components/admin/InventoryManager";
+import { getInventoryOverview } from "@/lib/inventory/inventory-service";
+import StockOverview from "@/components/admin/inventory/StockOverview";
 
 export const metadata: Metadata = {
-  title: "Admin — Stock & Inventory Control",
+  title: "Inventory Control & Ledger — Admin Portal",
 };
 
 export default async function AdminInventoryPage() {
-  const variants = await prisma.productVariant.findMany({
-    include: {
-      product: {
-        include: {
-          category: true,
-        },
-      },
-    },
-    orderBy: [{ stock: "asc" }],
-  });
+  const [overview, categories, brands] = await Promise.all([
+    getInventoryOverview({ limit: 500 }),
+    prisma.category.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.brand.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
-  const inventoryData: VariantInventoryItem[] = variants.map((v) => ({
-    id: v.id,
-    sku: v.sku,
-    title: v.title,
-    stock: v.stock,
-    price: v.price,
-    isAvailable: v.isAvailable,
-    productId: v.productId,
-    productTitle: v.product.title,
-    productStockMode: v.product.stockMode,
-    categoryName: v.product.category?.name || "General",
-  }));
-
-  return <InventoryManager inventory={inventoryData} />;
+  return (
+    <StockOverview
+      initialData={{
+        items: overview.items,
+        stats: overview.stats,
+        categories,
+        brands,
+        orderMap: overview.orderMap,
+      }}
+    />
+  );
 }

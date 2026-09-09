@@ -192,12 +192,74 @@ export async function GET(req: NextRequest) {
     ].map(escapeCSV).join(","));
 
     csvContent = [headers.join(","), ...rows].join("\n");
+  } else if (type === "products-template") {
+    filename = "vaishnavi-products-import-template.csv";
+    const headers = [
+      "Title",
+      "Slug",
+      "Category",
+      "Brand",
+      "SKU",
+      "Selling Price",
+      "MRP",
+      "Stock",
+      "Unit",
+      "HSN",
+      "Weight (g)",
+      "Length (cm)",
+      "Width (cm)",
+      "Height (cm)",
+      "Short Description",
+      "Description",
+    ];
+
+    const sampleRows = [
+      [
+        "1200mm Brushless BLDC Ceiling Fan with Remote",
+        "bldc-ceiling-fan-1200mm",
+        "Electricals",
+        "Havells",
+        "HV-BLDC-1200",
+        "2499",
+        "3999",
+        "50",
+        "Piece",
+        "8414",
+        "4500",
+        "50",
+        "30",
+        "25",
+        "Energy efficient 28W BLDC ceiling fan with smart remote control.",
+        "High quality ceiling fan offering 65% power saving with 2-year manufacturer warranty.",
+      ].map(escapeCSV).join(","),
+    ];
+
+    csvContent = [headers.join(","), ...sampleRows].join("\n");
   } else {
+    // Filtered Products Export (variant-level)
+    const statusParam = searchParams.get("status");
+    const categoryIdParam = searchParams.get("categoryId");
+    const brandIdParam = searchParams.get("brandId");
+    const searchParam = searchParams.get("search");
+
+    const where: any = { deletedAt: null };
+    if (statusParam && statusParam !== "ALL") where.status = statusParam;
+    if (categoryIdParam && categoryIdParam !== "ALL") where.categoryId = categoryIdParam;
+    if (brandIdParam && brandIdParam !== "ALL") where.brandId = brandIdParam;
+    if (searchParam) {
+      where.OR = [
+        { title: { contains: searchParam } },
+        { slug: { contains: searchParam } },
+        { variants: { some: { sku: { contains: searchParam } } } },
+      ];
+    }
+
     const products = await prisma.product.findMany({
+      where,
       include: {
         category: true,
         brand: true,
-        variants: true,
+        variants: { orderBy: { position: "asc" } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -205,28 +267,64 @@ export async function GET(req: NextRequest) {
     const headers = [
       "Product ID",
       "Title",
+      "Slug",
+      "Status",
       "Category",
       "Brand",
-      "Base Price (INR)",
-      "Checkout Mode",
-      "Stock Mode",
-      "Total Stock",
+      "SKU",
+      "Variant Name",
+      "Selling Price (INR)",
+      "MRP (INR)",
+      "Stock",
+      "Unit",
       "HSN Code",
-      "GST Rate (%)",
+      "Created Date",
     ];
 
-    const rows = products.map((p) => [
-      p.id,
-      p.title,
-      p.category?.name || "",
-      p.brand?.name || "",
-      p.basePrice,
-      p.checkoutMode,
-      p.stockMode,
-      p.variants.reduce((s, v) => s + v.stock, 0),
-      p.hsnCode || p.category?.hsnCode || "8541",
-      p.gstRate || p.category?.gstRate || 18,
-    ].map(escapeCSV).join(","));
+    const rows: string[] = [];
+    for (const p of products) {
+      if (p.variants.length === 0) {
+        rows.push(
+          [
+            p.id,
+            p.title,
+            p.slug,
+            p.status,
+            p.category?.name || "",
+            p.brand?.name || "",
+            "",
+            "Standard",
+            p.basePrice,
+            p.basePrice,
+            0,
+            p.unit || "Piece",
+            p.hsnCode || p.category?.hsnCode || "8541",
+            p.createdAt.toISOString().slice(0, 10),
+          ].map(escapeCSV).join(",")
+        );
+      } else {
+        for (const v of p.variants) {
+          rows.push(
+            [
+              p.id,
+              p.title,
+              p.slug,
+              p.status,
+              p.category?.name || "",
+              p.brand?.name || "",
+              v.sku || "",
+              v.title,
+              v.price ?? p.basePrice,
+              v.mrp ?? v.price ?? p.basePrice,
+              v.stock,
+              p.unit || "Piece",
+              p.hsnCode || p.category?.hsnCode || "8541",
+              p.createdAt.toISOString().slice(0, 10),
+            ].map(escapeCSV).join(",")
+          );
+        }
+      }
+    }
 
     csvContent = [headers.join(","), ...rows].join("\n");
   }

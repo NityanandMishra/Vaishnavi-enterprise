@@ -98,8 +98,9 @@ export default function AdminSidebar({
       label: "INVENTORY",
       items: [
         { href: "/admin/inventory", label: "Stock Overview", icon: Boxes },
-        { href: "/admin/inventory/adjustments", label: "Adjustments", icon: ClipboardList },
-        { href: "/admin/inventory?filter=low_stock", label: "Low Stock", icon: AlertTriangle, badge: 3, badgeVariant: "warning" },
+        { href: "/admin/inventory/low-stock", label: "Low Stock Queue", icon: AlertTriangle, badge: "Queue", badgeVariant: "warning" },
+        { href: "/admin/inventory/movements", label: "Movements Ledger", icon: ClipboardList },
+        { href: "/admin/inventory/bulk", label: "Bulk Stock Update", icon: Layers },
       ],
     },
     {

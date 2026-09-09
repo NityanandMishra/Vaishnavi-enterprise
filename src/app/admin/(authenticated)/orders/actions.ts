@@ -77,6 +77,38 @@ export async function getOrderDetails(id: string) {
 
 export async function updateOrderStatus(id: string, status: string) {
   try {
+    const currentOrder = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+
+    if (!currentOrder) {
+      return { success: false, error: "Order not found" };
+    }
+
+    // Inventory transitions (EPIC-04: INV-04, INV-05)
+    if (status === "FULFILLED" && currentOrder.status !== "FULFILLED") {
+      const { fulfilStock } = await import("@/lib/inventory/inventory-service");
+      const items = currentOrder.items
+        .filter((i) => i.variantId)
+        .map((i) => ({
+          variantId: i.variantId!,
+          quantity: i.quantity,
+        }));
+      if (items.length > 0) {
+        await fulfilStock({
+          orderId: id,
+          items,
+        });
+      }
+    } else if (status === "CANCELLED" && currentOrder.status !== "CANCELLED") {
+      const { releaseStock } = await import("@/lib/inventory/inventory-service");
+      await releaseStock({
+        orderId: id,
+        reason: "Order cancelled by admin",
+      });
+    }
+
     const order = await prisma.order.update({
       where: { id },
       data: { status },
@@ -84,6 +116,7 @@ export async function updateOrderStatus(id: string, status: string) {
 
     revalidatePath("/admin/orders");
     revalidatePath(`/admin/orders/${id}`);
+    revalidatePath("/admin/inventory");
     return { success: true, order };
   } catch (error: any) {
     console.error(`Error updating status for order ${id}:`, error);

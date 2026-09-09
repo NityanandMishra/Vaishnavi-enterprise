@@ -13,6 +13,7 @@ export interface UploadedMediaItem {
   width?: number;
   height?: number;
   isMain?: boolean;
+  altText?: string;
 }
 
 interface MediaUploaderProps {

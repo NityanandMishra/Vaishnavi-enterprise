@@ -7,6 +7,12 @@ async function main() {
   console.log("Starting database seeding...");
 
   // 1. Clean existing records (in reverse dependency order)
+  await prisma.categoryHsnMapping.deleteMany();
+  await prisma.taxSettings.deleteMany();
+  await prisma.hsnPriceSlab.deleteMany();
+  await prisma.hsnRateVersion.deleteMany();
+  await prisma.hsnCode.deleteMany();
+  await prisma.unit.deleteMany();
   await prisma.variantAttributeValue.deleteMany();
   await prisma.productAttributeValue.deleteMany();
   await prisma.categoryAttribute.deleteMany();
@@ -249,6 +255,230 @@ async function main() {
   });
 
   console.log("Seeded Attributes, Values, and Category Linkages.");
+
+  // 5c. Seed Units of Measure (FR-03: 12 Default Units)
+  const defaultUnits = [
+    { name: "Piece", symbol: "pcs", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+    { name: "Set", symbol: "set", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+    { name: "Pair", symbol: "pr", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+    { name: "Kilogram", symbol: "kg", unitType: "WEIGHT", decimalPrecision: 3, isSystem: true },
+    { name: "Gram", symbol: "g", unitType: "WEIGHT", decimalPrecision: 2, isSystem: true },
+    { name: "Litre", symbol: "l", unitType: "VOLUME", decimalPrecision: 2, isSystem: true },
+    { name: "Millilitre", symbol: "ml", unitType: "VOLUME", decimalPrecision: 0, isSystem: true },
+    { name: "Metre", symbol: "m", unitType: "LENGTH", decimalPrecision: 2, isSystem: true },
+    { name: "Centimetre", symbol: "cm", unitType: "LENGTH", decimalPrecision: 1, isSystem: true },
+    { name: "Box", symbol: "box", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+    { name: "Dozen", symbol: "dz", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+    { name: "Packet", symbol: "pkt", unitType: "COUNT", decimalPrecision: 0, isSystem: true },
+  ];
+
+  const seededUnits = {};
+  for (const u of defaultUnits) {
+    const created = await prisma.unit.create({ data: u });
+    seededUnits[u.name] = created;
+  }
+  console.log("Seeded 12 Default Units of Measure.");
+
+  // 5d. Seed HSN Codes & GST Rates
+  const hsn8504 = await prisma.hsnCode.create({
+    data: {
+      code: "8504",
+      description: "Electrical transformers, static converters (e.g. inverters) and inductors",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8414 = await prisma.hsnCode.create({
+    data: {
+      code: "8414",
+      description: "Electric fans, ventilating hoods and air extraction equipment",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8711 = await prisma.hsnCode.create({
+    data: {
+      code: "8711",
+      description: "Motorcycles, scooters and other electric two-wheelers",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 5.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8544 = await prisma.hsnCode.create({
+    data: {
+      code: "8544",
+      description: "Insulated wire, cables, and optical fibre cables",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn9405 = await prisma.hsnCode.create({
+    data: {
+      code: "9405",
+      description: "Luminaires and lighting fittings, LED lamps and light sources",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8536 = await prisma.hsnCode.create({
+    data: {
+      code: "8536",
+      description: "Electrical apparatus for switching or protecting electrical circuits (switches, sockets)",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8516 = await prisma.hsnCode.create({
+    data: {
+      code: "8516",
+      description: "Electric instantaneous or storage water heaters and space heating apparatus",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8507 = await prisma.hsnCode.create({
+    data: {
+      code: "8507",
+      description: "Electric accumulators, including separators therefor; lithium-ion batteries",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8714 = await prisma.hsnCode.create({
+    data: {
+      code: "8714",
+      description: "Parts and accessories of vehicles of headings 8711 to 8713",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  const hsn8517 = await prisma.hsnCode.create({
+    data: {
+      code: "8517",
+      description: "Telephones, mobiles and apparatus for transmission or reception of voice/data",
+      rateType: "FLAT",
+      rateVersions: {
+        create: {
+          gstRate: 18.0,
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+        },
+      },
+    },
+  });
+
+  // Price Slab HSN (Apparel: 6109)
+  const hsn6109 = await prisma.hsnCode.create({
+    data: {
+      code: "6109",
+      description: "T-shirts, singlets and other vests, knitted or crocheted",
+      rateType: "SLAB",
+      rateVersions: {
+        create: {
+          effectiveFrom: new Date("2024-01-01"),
+          createdBy: "System Seed",
+          slabs: {
+            create: [
+              { minPrice: 0.0, maxPrice: 1000.0, gstRate: 5.0 },
+              { minPrice: 1000.01, maxPrice: null, gstRate: 12.0 },
+            ],
+          },
+        },
+      },
+    },
+  });
+
+  console.log("Seeded HSN Codes & Rate Versions (Flat & Slab).");
+
+  // 5e. Seed Category ↔ HSN Mappings
+  await prisma.categoryHsnMapping.createMany({
+    data: [
+      { categoryId: catElectricalFittings.id, hsnId: hsn8536.id },
+      { categoryId: catElectricalWires.id, hsnId: hsn8544.id },
+      { categoryId: catFans.id, hsnId: hsn8414.id },
+      { categoryId: catLEDLighting.id, hsnId: hsn9405.id },
+      { categoryId: catHomeAppliances.id, hsnId: hsn8516.id },
+      { categoryId: catUPSSystems.id, hsnId: hsn8504.id },
+      { categoryId: catElectricVehicles.id, hsnId: hsn8711.id },
+      { categoryId: catEVBatteries.id, hsnId: hsn8507.id },
+      { categoryId: catEVAccessories.id, hsnId: hsn8714.id },
+    ],
+  });
+  console.log("Seeded Category ↔ HSN Mappings.");
+
+  // 5f. Seed Tax Settings
+  await prisma.taxSettings.create({
+    data: {
+      sellerStateCode: "27", // Maharashtra
+      sellerGstin: "27AABCV1234K1Z5",
+      pricingMode: "EXCLUSIVE",
+      defaultHsnId: hsn8536.id,
+    },
+  });
+  console.log("Seeded Tax Settings.");
 
   // 6. Seed Products
 

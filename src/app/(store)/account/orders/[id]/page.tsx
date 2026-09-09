@@ -80,7 +80,14 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
   const address = JSON.parse(order.shippingAddress) as Record<string, string>;
   const subtotal = order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const gst = Math.round(subtotal * GST_RATE);
+  const totalCgst = order.items.reduce((sum, i) => sum + (i.cgstAmount ?? 0), 0);
+  const totalSgst = order.items.reduce((sum, i) => sum + (i.sgstAmount ?? 0), 0);
+  const totalIgst = order.items.reduce((sum, i) => sum + (i.igstAmount ?? 0), 0);
+  const totalCess = order.items.reduce((sum, i) => sum + (i.cessAmount ?? 0), 0);
+  const totalSnapshotTax = totalCgst + totalSgst + totalIgst + totalCess;
+  // Fallback for legacy orders prior to tax snapshotting
+  const gst = totalSnapshotTax > 0 ? totalSnapshotTax : Math.round(subtotal * GST_RATE);
+  const isIntraState = totalIgst === 0 && (totalCgst > 0 || totalSgst > 0);
   const status = STATUS_LABELS[order.status] ?? {
     label: order.status,
     className: "bg-slate-200 text-slate-700",
@@ -213,7 +220,14 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                     {item.variantTitle && (
                       <p className="text-xs text-slate-600 mt-0.5">{item.variantTitle}</p>
                     )}
-                    <p className="text-xs text-slate-600 mt-0.5">Qty: {item.quantity}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-slate-600">Qty: {item.quantity}</p>
+                      {item.hsnCode && (
+                        <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          HSN: {item.hsnCode}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm font-bold text-slate-900 whitespace-nowrap">
                     {formatINR(item.price * item.quantity)}
@@ -233,10 +247,38 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                   <dd>-{formatINR(order.discountAmount)}</dd>
                 </div>
               )}
-              <div className="flex justify-between">
-                <dt className="text-slate-600">GST (18% included)</dt>
-                <dd className="text-slate-900">{formatINR(gst)}</dd>
-              </div>
+              {totalSnapshotTax > 0 ? (
+                <>
+                  {isIntraState ? (
+                    <>
+                      <div className="flex justify-between">
+                        <dt className="text-slate-600">CGST (Central Tax)</dt>
+                        <dd className="text-slate-900">{formatINR(totalCgst)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-slate-600">SGST (State Tax)</dt>
+                        <dd className="text-slate-900">{formatINR(totalSgst)}</dd>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <dt className="text-slate-600">IGST (Integrated Tax)</dt>
+                      <dd className="text-slate-900">{formatINR(totalIgst)}</dd>
+                    </div>
+                  )}
+                  {totalCess > 0 && (
+                    <div className="flex justify-between">
+                      <dt className="text-slate-600">CESS</dt>
+                      <dd className="text-slate-900">{formatINR(totalCess)}</dd>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex justify-between">
+                  <dt className="text-slate-600">GST (18% included)</dt>
+                  <dd className="text-slate-900">{formatINR(gst)}</dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt className="text-slate-600">Shipping</dt>
                 <dd className="text-slate-900">

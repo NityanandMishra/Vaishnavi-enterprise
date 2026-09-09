@@ -9,6 +9,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { authOptions } from "@/lib/nextauth";
 import { CART_COOKIE, cartInclude, cartTotals, lineItemPrice } from "@/lib/cart";
+import { calculateTax, roundPaisa } from "@/lib/tax/tax-engine";
+import { getStateCodeByName } from "@/lib/tax/indian-states";
 
 async function currentUserId(): Promise<string | undefined> {
   const session = await getServerSession(authOptions);
@@ -378,15 +380,35 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     return { ok: false as const, error: "Your cart is empty." };
   }
 
-  const lines = cart.items.map((item) => ({
+  // Fetch active TaxSettings singleton
+  const taxSettings = await prisma.taxSettings.findFirst({
+    include: {
+      defaultHsn: {
+        include: {
+          rateVersions: {
+            orderBy: [{ effectiveFrom: "desc" }],
+            include: { slabs: true },
+          },
+        },
+      },
+    },
+  });
+
+  const sellerStateCode = taxSettings?.sellerStateCode || "27";
+  const deliveryStateCode = getStateCodeByName(parsed.data.state, sellerStateCode);
+  const pricingMode = (taxSettings?.pricingMode || "EXCLUSIVE") as "EXCLUSIVE" | "INCLUSIVE";
+
+  const rawLines = cart.items.map((item) => ({
+    item,
     productId: item.productId,
     variantId: item.variantId,
+    productTitle: item.product.title,
     variantTitle: item.variant?.title ?? null,
     quantity: item.quantity,
     price: lineItemPrice(item.product.basePrice, item.variant?.price),
   }));
 
-  const { subtotal } = cartTotals(lines);
+  const subtotal = rawLines.reduce((sum, l) => sum + l.price * l.quantity, 0);
 
   // Validate discount if coupon provided
   let discountAmount = 0;
@@ -400,22 +422,146 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     }
   }
 
-  const finalSubtotal = Math.max(0, subtotal - discountAmount);
-  const gst = Math.round(finalSubtotal * 0.18);
-  const finalTotal = finalSubtotal + gst;
+  // Pre-fetch any HSN codes if product only has hsnCode string and no hsnRel
+  const unlinkedHsnCodes = Array.from(
+    new Set(
+      cart.items
+        .filter(
+          (i) =>
+            !i.product.hsnRel &&
+            !i.product.category?.hsnMapping?.hsn &&
+            !i.product.category?.parent?.hsnMapping?.hsn &&
+            i.product.hsnCode
+        )
+        .map((i) => i.product.hsnCode as string)
+    )
+  );
+
+  const extraHsnRecords =
+    unlinkedHsnCodes.length > 0
+      ? await prisma.hsnCode.findMany({
+          where: { code: { in: unlinkedHsnCodes }, deletedAt: null },
+          include: {
+            rateVersions: {
+              orderBy: [{ effectiveFrom: "desc" }],
+              include: { slabs: true },
+            },
+          },
+        })
+      : [];
+  const extraHsnMap = new Map(extraHsnRecords.map((h) => [h.code, h]));
+
+  // Calculate taxes per line with GST engine
+  const lines = rawLines.map(({ item, productId, variantId, productTitle, variantTitle, quantity, price }) => {
+    let resolvedHsn: any = null;
+    if (item.product.hsnRel && !item.product.hsnRel.deletedAt) {
+      resolvedHsn = item.product.hsnRel;
+    } else if (item.product.category?.hsnMapping?.hsn && !item.product.category.hsnMapping.hsn.deletedAt) {
+      resolvedHsn = item.product.category.hsnMapping.hsn;
+    } else if (item.product.category?.parent?.hsnMapping?.hsn && !item.product.category.parent.hsnMapping.hsn.deletedAt) {
+      resolvedHsn = item.product.category.parent.hsnMapping.hsn;
+    } else if (item.product.hsnCode && extraHsnMap.has(item.product.hsnCode)) {
+      resolvedHsn = extraHsnMap.get(item.product.hsnCode);
+    } else if (taxSettings?.defaultHsn && !taxSettings.defaultHsn.deletedAt) {
+      resolvedHsn = taxSettings.defaultHsn;
+    } else {
+      resolvedHsn = {
+        code: "8536",
+        description: "Electrical apparatus",
+        rateType: "FLAT",
+        cessRate: 0,
+        rateVersions: [{ id: "fallback-v1", gstRate: 18, effectiveFrom: new Date(), effectiveTo: null }],
+      };
+    }
+
+    const itemSubtotal = price * quantity;
+    const itemDiscount = subtotal > 0 ? (itemSubtotal / subtotal) * discountAmount : 0;
+    const discountPerUnit = quantity > 0 ? itemDiscount / quantity : 0;
+
+    const taxResult = calculateTax({
+      unitPrice: price,
+      quantity,
+      discountPerUnit,
+      hsn: resolvedHsn,
+      sellerStateCode,
+      deliveryStateCode,
+      pricingMode,
+    });
+
+    return {
+      productId,
+      variantId,
+      productTitle,
+      variantTitle,
+      quantity,
+      price,
+      hsnCode: resolvedHsn.code,
+      gstRate: taxResult.gstRate,
+      cgstAmount: taxResult.cgstAmount,
+      sgstAmount: taxResult.sgstAmount,
+      igstAmount: taxResult.igstAmount,
+      cessAmount: taxResult.cessAmount,
+      taxableValue: taxResult.taxableValue,
+      lineTotal: taxResult.lineTotal,
+    };
+  });
+
+  const totalLineTaxes = lines.reduce(
+    (sum, l) => sum + l.cgstAmount + l.sgstAmount + l.igstAmount + l.cessAmount,
+    0
+  );
+  const totalTaxable = lines.reduce((sum, l) => sum + l.taxableValue, 0);
+
+  const finalTotal =
+    pricingMode === "INCLUSIVE"
+      ? roundPaisa(lines.reduce((sum, l) => sum + l.lineTotal, 0))
+      : roundPaisa(totalTaxable + totalLineTaxes);
+
+  // Generate order ID
+  const orderId = crypto.randomUUID();
+
+  // Atomically reserve stock for tracked variants (EPIC-04: INV-03, FR-13)
+  const reservationLines = lines
+    .filter((l) => l.variantId)
+    .map((l) => ({
+      variantId: l.variantId!,
+      quantity: l.quantity,
+      productTitle: l.productTitle,
+      variantTitle: l.variantTitle,
+    }));
+
+  if (reservationLines.length > 0) {
+    try {
+      const { reserveStock } = await import("@/lib/inventory/inventory-service");
+      await reserveStock({
+        orderId,
+        items: reservationLines,
+      });
+    } catch (err: any) {
+      return {
+        ok: false as const,
+        error:
+          err.message ||
+          "One or more items in your cart are no longer available in the requested quantity.",
+      };
+    }
+  }
 
   // Razorpay capture happens here once the gateway is wired up.
   const order = await prisma.order.create({
     data: {
+      id: orderId,
       userId,
       status: parsed.data.paymentMethod === "COD" ? "COD_CONFIRMED" : "PENDING",
       totalAmount: finalTotal,
       discountAmount,
       couponCode: appliedCouponCode,
       paymentMethod: parsed.data.paymentMethod,
-      deliveryZone: parsed.data.state.toLowerCase().includes("uttar pradesh") ? "UP" : "PAN_INDIA",
+      deliveryZone: deliveryStateCode === "09" ? "UP" : "PAN_INDIA",
       shippingAddress: JSON.stringify(parsed.data),
-      items: { create: lines },
+      items: {
+        create: lines.map(({ lineTotal, productTitle, ...itemData }) => itemData),
+      },
     },
   });
 

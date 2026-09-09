@@ -12,22 +12,25 @@ export default async function AdminOrderInvoicePage({
 }: {
   params: { id: string };
 }) {
-  const order = await prisma.order.findUnique({
-    where: { id: params.id },
-    include: {
-      user: true,
-      items: {
-        include: {
-          product: {
-            include: {
-              category: true,
+  const [order, taxSettings] = await Promise.all([
+    prisma.order.findUnique({
+      where: { id: params.id },
+      include: {
+        user: true,
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+              },
             },
+            variant: true,
           },
-          variant: true,
         },
       },
-    },
-  });
+    }),
+    prisma.taxSettings.findFirst(),
+  ]);
 
   if (!order) {
     notFound();
@@ -39,7 +42,12 @@ export default async function AdminOrderInvoicePage({
   } catch (_) {}
 
   const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const gstAmount = Math.round(subtotal * 0.18);
+  const totalCgst = order.items.reduce((sum, item) => sum + (item.cgstAmount ?? 0), 0);
+  const totalSgst = order.items.reduce((sum, item) => sum + (item.sgstAmount ?? 0), 0);
+  const totalIgst = order.items.reduce((sum, item) => sum + (item.igstAmount ?? 0), 0);
+  const totalCess = order.items.reduce((sum, item) => sum + (item.cessAmount ?? 0), 0);
+  const totalSnapshotTax = totalCgst + totalSgst + totalIgst + totalCess;
+  const gstAmount = totalSnapshotTax > 0 ? totalSnapshotTax : Math.round(subtotal * 0.18);
 
   const invoiceData: InvoiceData = {
     invoiceNumber: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
@@ -53,9 +61,9 @@ export default async function AdminOrderInvoicePage({
       tradeName: "Vaishnavi Enterprises (Solar & Electrical Goods)",
       address: "Main Market, Suriyawan Road",
       city: "Suriyawan, Bhadohi",
-      state: "Uttar Pradesh",
+      state: taxSettings?.sellerStateCode === "09" ? "Uttar Pradesh" : "Maharashtra",
       pincode: "221404",
-      gstin: "09AAEPV1234F1Z5",
+      gstin: taxSettings?.sellerGstin || "09AAEPV1234F1Z5",
       phone: "+91 73888 47575",
       email: "info@vaishnavienterprises.in",
     },
@@ -73,9 +81,15 @@ export default async function AdminOrderInvoicePage({
       id: item.id,
       title: item.product.title,
       variantTitle: item.variantTitle || item.variant?.title || null,
-      hsnCode: item.product.hsnCode || item.product.category?.hsnCode || "8541",
+      hsnCode: item.hsnCode || item.product.hsnCode || item.product.category?.hsnCode || "8536",
       quantity: item.quantity,
       price: item.price,
+      taxableValue: item.taxableValue ?? undefined,
+      gstRate: item.gstRate ?? undefined,
+      cgstAmount: item.cgstAmount ?? undefined,
+      sgstAmount: item.sgstAmount ?? undefined,
+      igstAmount: item.igstAmount ?? undefined,
+      cessAmount: item.cessAmount ?? undefined,
     })),
     subtotal,
     discountAmount: order.discountAmount || 0,
@@ -83,6 +97,10 @@ export default async function AdminOrderInvoicePage({
     shippingCost: order.shippingCost || 0,
     gstAmount,
     totalAmount: order.totalAmount,
+    cgstTotal: totalCgst,
+    sgstTotal: totalSgst,
+    igstTotal: totalIgst,
+    cessTotal: totalCess,
   };
 
   return <InvoiceView invoice={invoiceData} backHref={`/admin/orders/${order.id}`} />;

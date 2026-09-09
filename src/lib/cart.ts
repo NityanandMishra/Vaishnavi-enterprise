@@ -14,6 +14,46 @@ export const cartInclude = {
       product: {
         include: {
           brand: true,
+          category: {
+            include: {
+              hsnMapping: {
+                include: {
+                  hsn: {
+                    include: {
+                      rateVersions: {
+                        orderBy: [{ effectiveFrom: "desc" }],
+                        include: { slabs: true },
+                      },
+                    },
+                  },
+                },
+              },
+              parent: {
+                include: {
+                  hsnMapping: {
+                    include: {
+                      hsn: {
+                        include: {
+                          rateVersions: {
+                            orderBy: [{ effectiveFrom: "desc" }],
+                            include: { slabs: true },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          hsnRel: {
+            include: {
+              rateVersions: {
+                orderBy: [{ effectiveFrom: "desc" }],
+                include: { slabs: true },
+              },
+            },
+          },
           images: {
             include: { image: true },
             orderBy: [{ isMain: "desc" }, { sortOrder: "asc" }],
