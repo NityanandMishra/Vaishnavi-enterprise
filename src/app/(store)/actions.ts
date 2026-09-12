@@ -517,8 +517,10 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
       ? roundPaisa(lines.reduce((sum, l) => sum + l.lineTotal, 0))
       : roundPaisa(totalTaxable + totalLineTaxes);
 
-  // Generate order ID
+  // Generate order ID and number
   const orderId = crypto.randomUUID();
+  const { generateOrderNumber, calculateSlaDueAt } = await import("@/lib/orders/order-service");
+  const orderNumber = await generateOrderNumber();
 
   // Atomically reserve stock for tracked variants (EPIC-04: INV-03, FR-13)
   const reservationLines = lines
@@ -547,21 +549,71 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     }
   }
 
-  // Razorpay capture happens here once the gateway is wired up.
+  const initialStatus = parsed.data.paymentMethod === "COD" ? "CONFIRMED" : "PENDING";
+  const initialPaymentStatus = parsed.data.paymentMethod === "COD" ? "PENDING" : "PAID";
+  const initialSlaDueAt = calculateSlaDueAt(initialStatus);
+
   const order = await prisma.order.create({
     data: {
       id: orderId,
+      orderNumber,
       userId,
-      status: parsed.data.paymentMethod === "COD" ? "COD_CONFIRMED" : "PENDING",
-      totalAmount: finalTotal,
+      source: "WEB",
+      status: initialStatus,
+      paymentStatus: initialPaymentStatus,
+      paymentMethod: parsed.data.paymentMethod,
+      subtotalAmount: roundPaisa(subtotal),
       discountAmount,
       couponCode: appliedCouponCode,
-      paymentMethod: parsed.data.paymentMethod,
+      shippingCost: 0,
+      taxableAmount: roundPaisa(totalTaxable),
+      cgstAmount: roundPaisa(lines.reduce((s, l) => s + l.cgstAmount, 0)),
+      sgstAmount: roundPaisa(lines.reduce((s, l) => s + l.sgstAmount, 0)),
+      igstAmount: roundPaisa(lines.reduce((s, l) => s + l.igstAmount, 0)),
+      cessAmount: roundPaisa(lines.reduce((s, l) => s + l.cessAmount, 0)),
+      taxAmount: roundPaisa(totalLineTaxes),
+      totalAmount: finalTotal,
+      paidAmount: parsed.data.paymentMethod === "COD" ? 0 : finalTotal,
+      balanceAmount: parsed.data.paymentMethod === "COD" ? finalTotal : 0,
+      deliveryStateCode,
       deliveryZone: deliveryStateCode === "09" ? "UP" : "PAN_INDIA",
       shippingAddress: JSON.stringify(parsed.data),
+      billingAddress: JSON.stringify(parsed.data),
+      customerName: parsed.data.fullName,
+      customerPhone: parsed.data.phone,
+      confirmedAt: initialStatus === "CONFIRMED" ? new Date() : null,
+      slaDueAt: initialSlaDueAt,
       items: {
-        create: lines.map(({ lineTotal, productTitle, ...itemData }) => itemData),
+        create: lines.map((l) => ({
+          productId: l.productId,
+          variantId: l.variantId,
+          productName: l.productTitle,
+          variantTitle: l.variantTitle,
+          sku: (l as any).sku || `SKU-${l.productId.slice(0, 6)}`,
+          quantity: l.quantity,
+          price: l.price,
+          hsnCode: l.hsnCode,
+          gstRate: l.gstRate,
+          cgstAmount: l.cgstAmount,
+          sgstAmount: l.sgstAmount,
+          igstAmount: l.igstAmount,
+          cessAmount: l.cessAmount,
+          taxableValue: l.taxableValue,
+          lineTotal: l.lineTotal,
+          status: "ACTIVE",
+        })),
       },
+    },
+  });
+
+  // Write initial timeline entry (ORD-09)
+  await prisma.orderStatusHistory.create({
+    data: {
+      orderId,
+      toStatus: initialStatus,
+      reason: "Order placed",
+      note: `Placed on website via ${parsed.data.paymentMethod}`,
+      createdBy: "Customer",
     },
   });
 

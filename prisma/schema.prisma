@@ -414,55 +414,190 @@ model CartItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 }
 
-// ─── ORDER ───────────────────────────────────────────────────────────────────
-// status values: "PENDING" | "CAPTURED" | "COD_CONFIRMED" | "FULFILLED" | "DELIVERED" | "CANCELLED" | "REFUNDED"
+// ─── ORDER (EPIC-05: ORD) ───────────────────────────────────────────────────
+// source values: "WEB" | "MANUAL" | "PHONE"
+// status values: "PENDING" | "CONFIRMED" | "PROCESSING" | "PACKED" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURNED"
+// paymentStatus values: "PENDING" | "PARTIALLY_PAID" | "PAID" | "REFUND_DUE" | "REFUNDED" | "FAILED"
+// paymentMethod values: "COD" | "UPI" | "CARD" | "NETBANKING" | "WALLET" | "BANK_TRANSFER" | "CASH" | "RAZORPAY"
 
 model Order {
   id                String    @id @default(uuid())
-  userId            String
+  orderNumber       String?   @unique // Human-facing e.g. "VE-2026-0891"
+  userId            String?   // Nullable for guest/manual orders
+  source            String    @default("WEB") // "WEB" | "MANUAL" | "PHONE"
   status            String    @default("PENDING")
-  totalAmount       Float
+  paymentStatus     String    @default("PENDING") // "PENDING" | "PARTIALLY_PAID" | "PAID" | "REFUND_DUE" | "REFUNDED" | "FAILED"
+  paymentMethod     String    // "COD" | "UPI" | "CARD" | "NETBANKING" | "WALLET" | "BANK_TRANSFER" | "CASH" | "RAZORPAY"
+
+  // Stored financial snapshots, never recomputed on read (FI-03)
+  subtotalAmount    Float     @default(0)
   discountAmount    Float     @default(0)
+  shippingCost      Float     @default(0)
+  taxableAmount     Float     @default(0)
+  cgstAmount        Float     @default(0)
+  sgstAmount        Float     @default(0)
+  igstAmount        Float     @default(0)
+  cessAmount        Float     @default(0)
+  taxAmount         Float     @default(0)
+  totalAmount       Float
+  paidAmount        Float     @default(0)
+  balanceAmount     Float     @default(0)
+  refundDueAmount   Float     @default(0)
+
+  // Snapshot addresses (JSON strings) & delivery location
+  shippingAddress   String    // SQLite: JSON string snapshot of address
+  billingAddress    String?   // SQLite: JSON string snapshot of billing address
+  deliveryStateCode String?   // e.g. "27", "29", "09"
+  deliveryZone      String?   // "LOCAL" | "UP" | "PAN_INDIA" | "REST_OF_INDIA" | "MUMBAI_METRO"
+
+  // Denormalised customer snapshot for fast multi-field search & manual/guest orders
+  customerName      String?
+  customerPhone     String?
+  customerEmail     String?
+  customerNote      String?
+
+  // External references
   couponCode        String?
-  paymentMethod     String    // "RAZORPAY" | "COD"
   razorpayOrderId   String?   @unique
   razorpayPaymentId String?   @unique
   shiprocketOrderId String?   @unique
-  shippingCost      Float     @default(0)
-  deliveryZone      String    // "LOCAL" | "UP" | "PAN_INDIA"
   trackingNumber    String?
   trackingUrl       String?
-  shippingAddress   String    // SQLite: JSON string snapshot of address
   sellerId          String?   // House seller record default (D-02)
+
+  // Status timestamps & SLA (ORD-10)
+  placedAt          DateTime  @default(now())
+  confirmedAt       DateTime?
+  processingAt      DateTime?
+  packedAt          DateTime?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  cancelledAt       DateTime?
+  cancellationReason String?
+  cancellationNote   String?
+  slaDueAt          DateTime? // Configurable SLA in hours (ORD-10)
+  createdBy         String?   // Staff name/id for manual orders
+  version           Int       @default(1)
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  user  User        @relation(fields: [userId], references: [id])
-  items OrderItem[]
+  user          User?                @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  notes         OrderNote[]
+  invoice       Invoice?
+
+  @@index([status, placedAt])
+  @@index([slaDueAt])
 }
 
-// ─── ORDER ITEM ──────────────────────────────────────────────────────────────
+// ─── ORDER ITEM (SNAPSHOT OF EVERYTHING — FI-01) ─────────────────────────────
+// status values: "ACTIVE" | "CANCELLED"
 
 model OrderItem {
   id           String  @id @default(uuid())
   orderId      String
   productId    String
   variantId    String? // Nullable relation if variant gets deleted
-  variantTitle String? // Snapshot variant title (e.g. "1200mm Brown")
+  productName  String? // Snapshot product title at placement (e.g. "Cotton Kurta Set")
+  variantTitle String? // Snapshot variant title (e.g. "Red / M")
+  sku          String? // Snapshot SKU (e.g. "VE-APP-KUR-RED-M")
   quantity     Int
-  price        Float   // Price at time of order (snapshot)
+  price        Float   // Unit price at time of order (snapshot)
+  originalPrice Float? // List price if overridden in manual order
+  discountAmount Float? @default(0) // Snapshot line discount
+  taxableValue Float?  // Snapshot per-line taxable value
   hsnCode      String? // Snapshot HSN code at order placement time
   gstRate      Float?  // Snapshot GST % at order placement time
   cgstAmount   Float?  @default(0) // Snapshot CGST amount
   sgstAmount   Float?  @default(0) // Snapshot SGST amount
   igstAmount   Float?  @default(0) // Snapshot IGST amount
   cessAmount   Float?  @default(0) // Snapshot CESS amount
-  taxableValue Float?  // Snapshot per-line taxable value
+  lineTotal    Float?  // Snapshot line total after taxes and discounts
+  status       String  @default("ACTIVE") // "ACTIVE" | "CANCELLED"
+  cancelledQty Int     @default(0)
+  createdAt    DateTime @default(now())
 
-  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product         @relation(fields: [productId], references: [id])
-  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order       Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product               @relation(fields: [productId], references: [id])
+  variant     ProductVariant?       @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  adjustments OrderLineAdjustment[]
+
+  @@index([orderId])
+  @@index([sku])
+}
+
+// ─── ORDER LINE ADJUSTMENTS (ORD-05: CORRECTIONS WITHOUT MUTATING LINE) ──────
+// adjustmentType values: "CANCELLATION" | "DISCOUNT"
+
+model OrderLineAdjustment {
+  id             String   @id @default(uuid())
+  orderItemId    String
+  adjustmentType String   // "CANCELLATION" | "DISCOUNT"
+  quantity       Int      @default(0)
+  amount         Float    // Reduction in line taxable/base amount
+  taxAmount      Float    @default(0) // Reduction in tax amount
+  reason         String?
+  createdBy      String?  // Actor name/id
+  createdAt      DateTime @default(now())
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId])
+}
+
+// ─── ORDER STATUS HISTORY (ORD-09: AUDIT TIMELINE) ───────────────────────────
+
+model OrderStatusHistory {
+  id         String   @id @default(uuid())
+  orderId    String
+  fromStatus String?
+  toStatus   String
+  reason     String?
+  note       String?
+  createdBy  String?  // Actor name/id or "System"
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// ─── ORDER NOTES (ORD-08: INTERNAL & CUSTOMER NOTES) ────────────────────────
+
+model OrderNote {
+  id                String   @id @default(uuid())
+  orderId           String
+  body              String
+  isCustomerVisible Boolean  @default(false)
+  createdBy         String?  // Actor name/id
+  createdAt         DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// ─── INVOICE (ORD-11: GAPLESS GST INVOICE) ───────────────────────────────────
+
+model Invoice {
+  id             String   @id @default(uuid())
+  orderId        String   @unique
+  invoiceNumber  String   @unique // e.g. "VE/26-27/0042"
+  financialYear  String   // e.g. "2026-27"
+  sequenceNumber Int      // Sequential gapless number within FY
+  totalAmount    Float
+  taxAmount      Float
+  pdfUrl         String?
+  invoiceData    String   // JSON snapshot of seller, buyer, line items, taxes
+  generatedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([financialYear, sequenceNumber])
 }
 
 // ─── COUPON ──────────────────────────────────────────────────────────────────

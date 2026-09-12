@@ -613,17 +613,19 @@ export async function releaseStock(input: ReleaseStockInput) {
   const defaultLoc = await getDefaultLocation();
 
   return await prisma.$transaction(async (tx) => {
-    // Check idempotency
-    const existing = await tx.inventoryMovement.findFirst({
-      where: {
-        referenceType: "ORDER",
-        referenceId: input.orderId,
-        movementType: MovementType.RELEASE,
-      },
-    });
+    // If specific items not provided, check full order idempotency
+    if (!input.items || input.items.length === 0) {
+      const existing = await tx.inventoryMovement.findFirst({
+        where: {
+          referenceType: "ORDER",
+          referenceId: input.orderId,
+          movementType: MovementType.RELEASE,
+        },
+      });
 
-    if (existing) {
-      return { success: true, alreadyReleased: true };
+      if (existing) {
+        return { success: true, alreadyReleased: true };
+      }
     }
 
     // If specific items not provided, load reserved items from Order
