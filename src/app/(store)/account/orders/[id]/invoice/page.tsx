@@ -74,9 +74,9 @@ export default async function CustomerOrderInvoicePage({
       email: "info@vaishnavienterprises.in",
     },
     buyer: {
-      name: address.fullName || order.user.name || "Customer",
-      phone: address.phone || address.alternatePhone || order.user.phone || undefined,
-      email: order.user.email || undefined,
+      name: address.fullName || order.user?.name || "Customer",
+      phone: address.phone || address.alternatePhone || order.user?.phone || undefined,
+      email: order.user?.email || undefined,
       addressLine1: address.addressLine1 || "Local Address",
       addressLine2: address.addressLine2 || null,
       city: address.city || "Suriyawan",

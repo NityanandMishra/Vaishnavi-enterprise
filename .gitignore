@@ -35,3 +35,4 @@ yarn-error.log*
 # Development & reference docs
 /Implementation Plans Docs/
 /docs/
+/Claude outputs/

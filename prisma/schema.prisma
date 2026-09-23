@@ -488,6 +488,9 @@ model Order {
   statusHistory OrderStatusHistory[]
   notes         OrderNote[]
   invoice       Invoice?
+  transactions  PaymentTransaction[]
+  refunds       Refund[]
+  codCollection CodCollection?
 
   @@index([status, placedAt])
   @@index([slaDueAt])
@@ -880,5 +883,228 @@ model StockAlert {
   @@index([variantId, resolvedAt])
   @@index([alertType, resolvedAt])
 }
+
+// ─── EPIC-06: PAYMENT MANAGEMENT (PAY) ────────────────────────────────────────
+
+// ─── PAYMENT TRANSACTIONS (APPEND-ONLY — FR-03, SEC-01) ──────────────────────
+// status: "PENDING" | "PARTIALLY_PAID" | "PAID" | "PARTIALLY_REFUNDED" | "REFUNDED" | "FAILED" | "EXPIRED"
+// gateway: "RAZORPAY" | "PAYU" | "CASHFREE" | "MANUAL" | "COD"
+// method: "UPI" | "COD" | "CARD" | "NETBANKING" | "WALLET" | "BANK_TRANSFER" | "CASH"
+
+model PaymentTransaction {
+  id                     String    @id @default(uuid())
+  orderId                String
+  gateway                String    @default("RAZORPAY")
+  gatewayTransactionId   String?   // e.g. "pay_MkL9xY2aBcDeFg"
+  gatewayOrderId         String?   // e.g. "order_xyz"
+  method                 String    // "UPI" | "COD" | "CARD" | "NETBANKING" | "WALLET" | "BANK_TRANSFER" | "CASH"
+  amountPaise            Int       // Stored as integer paise (e.g. 195076 for ₹1,950.76)
+  currency               String    @default("INR")
+  status                 String    @default("PENDING")
+  gatewayResponseCode    String?
+  gatewayResponseMessage String?
+  cardLastFour           String?   // Gateway-supplied only, never full PAN (SEC-01)
+  upiVpaMasked           String?
+  bankName               String?
+  initiatedAt            DateTime  @default(now())
+  completedAt            DateTime?
+  createdAt              DateTime  @default(now())
+
+  // Note: Append-only per PRD A.7. Status changes write to PaymentEvent.
+  order               Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events              PaymentEvent[]
+  refunds             Refund[]
+  reconciliationItems ReconciliationItem[]
+
+  @@index([orderId])
+  @@index([gatewayTransactionId])
+  @@index([status, createdAt])
+}
+
+// ─── PAYMENT EVENTS (APPEND-ONLY LOG — FR-03, SEC-03) ────────────────────────
+model PaymentEvent {
+  id                String   @id @default(uuid())
+  transactionId     String
+  eventType         String   // e.g. "payment.captured", "payment.authorized", "payment.failed"
+  fromStatus        String?
+  toStatus          String
+  gatewayEventId    String?  @unique // Idempotency key (SEC-03)
+  rawPayload        String?  // JSON string
+  signatureVerified Boolean  @default(false)
+  processedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  transaction PaymentTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId, createdAt])
+}
+
+// ─── REFUNDS (FR-11, FR-14, FR-15, SEC-04) ───────────────────────────────────
+// status: "REQUESTED" | "APPROVED" | "PROCESSING" | "COMPLETED" | "FAILED" | "REJECTED"
+// reasonCode: "ORDER_CANCELLED" | "OUT_OF_STOCK" | "DAMAGED_ON_ARRIVAL" | "WRONG_ITEM_SENT" | "CUSTOMER_REQUEST" | "DUPLICATE_PAYMENT" | "OTHER"
+// method: "gateway" | "bank_transfer" | "upi" | "cash"
+
+model Refund {
+  id                String    @id @default(uuid())
+  orderId           String
+  transactionId     String?   // Nullable for COD manual refunds
+  refundNumber      String    @unique // e.g. "REF-2026-0001"
+  amountPaise       Int       // Stored as integer paise
+  taxComponentPaise Int       @default(0) // Derived from stored order lines (reclaimable GST)
+  reasonCode        String
+  note              String?
+  status            String    @default("PROCESSING")
+  gatewayRefundId   String?   // e.g. "rfnd_xyz"
+  method            String    @default("gateway")
+  referenceNumber   String?   // Mandatory for manual / COD refunds
+  requestedBy       String?   // Actor ID
+  requestedByName   String?   // Actor Name
+  requestedAt       DateTime  @default(now())
+  approvedBy        String?   // Second approver ID (SEC-04)
+  approvedByName    String?   // Second approver Name
+  approvedAt        DateTime?
+  completedAt       DateTime?
+  failureReason     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  transaction PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([refundNumber])
+}
+
+// ─── COD COLLECTIONS (FR-18, FR-20) ──────────────────────────────────────────
+// status: "PENDING" | "COLLECTED" | "REMITTED" | "DISCREPANCY"
+
+model CodCollection {
+  id              String    @id @default(uuid())
+  orderId         String    @unique
+  shipmentId      String?
+  courierId       String?   // e.g. "Delhivery", "Blue Dart"
+  expectedPaise   Int
+  collectedPaise  Int?
+  collectedAt     DateTime?
+  remittanceId    String?
+  status          String    @default("PENDING")
+  discrepancyNote String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  order      Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  remittance CodRemittance? @relation(fields: [remittanceId], references: [id], onDelete: SetNull)
+
+  @@index([courierId, status])
+  @@index([status])
+}
+
+// ─── COD REMITTANCES (FR-19, PAY-07) ─────────────────────────────────────────
+// status: "RECONCILED" | "DISCREPANCY"
+
+model CodRemittance {
+  id               String    @id @default(uuid())
+  courierId        String    // e.g. "Delhivery"
+  remittanceDate   DateTime  @default(now())
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  expectedPaise    Int
+  receivedPaise    Int
+  variancePaise    Int       @default(0) // expected - received
+  bankReference    String?
+  status           String    @default("RECONCILED")
+  note             String?
+  reconciledBy     String?
+  reconciledByName String?
+  reconciledAt     DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  collections CodCollection[]
+
+  @@index([courierId])
+  @@index([status])
+}
+
+// ─── SETTLEMENTS (FR-21, PAY-09) ──────────────────────────────────────────────
+// status: "OPEN" | "RECONCILED"
+
+model Settlement {
+  id               String    @id @default(uuid())
+  gateway          String    @default("RAZORPAY")
+  settlementId     String    @unique // e.g. "setl_MkL9xY"
+  settlementDate   DateTime
+  grossPaise       Int
+  feesPaise        Int
+  taxOnFeesPaise   Int
+  netPaise         Int
+  bankReference    String?   // e.g. UTR number
+  transactionCount Int       @default(0)
+  reconciledAt     DateTime?
+  status           String    @default("OPEN")
+  createdAt        DateTime  @default(now())
+
+  reconciliationItems ReconciliationItem[]
+
+  @@index([gateway, settlementDate])
+  @@index([status])
+}
+
+// ─── RECONCILIATION ITEMS (FR-22, FR-23) ─────────────────────────────────────
+// mismatchType: "IN_GATEWAY_NOT_PLATFORM" | "IN_PLATFORM_NOT_GATEWAY" | "AMOUNT_MISMATCH" | "STATUS_MISMATCH"
+// status: "OPEN" | "RESOLVED" | "IGNORED"
+
+model ReconciliationItem {
+  id                  String    @id @default(uuid())
+  settlementId        String
+  transactionId       String?
+  gatewayTxnId        String?
+  orderNumber         String?
+  mismatchType        String
+  platformAmountPaise Int?
+  gatewayAmountPaise  Int?
+  status              String    @default("OPEN")
+  resolutionNote      String?
+  resolvedBy          String?
+  resolvedByName      String?
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  settlement  Settlement          @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  transaction PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([settlementId])
+  @@index([status])
+}
+
+// ─── WEBHOOK LOG (RAW INGESTION BEFORE PROCESSING — FR-07, SEC-02) ───────────
+model WebhookLog {
+  id              String    @id @default(uuid())
+  gateway         String    @default("RAZORPAY")
+  eventId         String?   // Gateway event id
+  eventType       String?
+  rawBody         String    // Persisted verbatim before any processing
+  headers         String?   // JSON headers string
+  signatureValid  Boolean   @default(false)
+  processed       Boolean   @default(false)
+  processingError String?
+  retryCount      Int       @default(0)
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+
+  @@index([gateway, eventId])
+  @@index([processed])
+  @@index([signatureValid])
+}
+
+// ─── PAYMENT SETTINGS (CONFIGURABLE APPROVAL THRESHOLD — PAY-05) ─────────────
+model PaymentSettings {
+  id                      String   @id @default("default")
+  refundApprovalThreshold Int      @default(1000000) // Default ₹10,000 in paise
+  codAutoDiscrepancyHours Int      @default(48)      // Hours before delivered without cash flags discrepancy
+  updatedAt               DateTime @updatedAt
+  updatedBy               String?
+}
+
 
 

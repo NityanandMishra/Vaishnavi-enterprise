@@ -46,12 +46,21 @@ const STATUS_VARIANT_MAP: Record<string, { variant: BadgeVariant; label: string 
   DELIVERED: { variant: "success", label: "Delivered" },
   IN_STOCK: { variant: "success", label: "In Stock" },
   CLOSED_WON: { variant: "success", label: "Closed Won" },
+  COLLECTED: { variant: "success", label: "Collected" },
+  REMITTED: { variant: "success", label: "Remitted" },
+  RECONCILED: { variant: "success", label: "Reconciled" },
+  RESOLVED: { variant: "success", label: "Resolved" },
+  COMPLETED: { variant: "success", label: "Completed" },
+  APPROVED: { variant: "progress", label: "Approved" },
 
   // Warning / Needs Attention
   LOW_STOCK: { variant: "warning", label: "Low Stock" },
   PAYMENT_PENDING: { variant: "warning", label: "Payment Pending" },
   PARTIALLY_SHIPPED: { variant: "warning", label: "Partially Shipped" },
   PARTIALLY_REFUNDED: { variant: "warning", label: "Partially Refunded" },
+  PARTIALLY_PAID: { variant: "warning", label: "Partially Paid" },
+  REQUESTED: { variant: "warning", label: "Awaiting Approval" },
+  OPEN: { variant: "warning", label: "Open" },
 
   // Danger / Terminal Bad
   OUT_OF_STOCK: { variant: "danger", label: "Out of Stock" },
@@ -60,7 +69,11 @@ const STATUS_VARIANT_MAP: Record<string, { variant: BadgeVariant; label: string 
   FAILED_DELIVERY: { variant: "danger", label: "Delivery Failed" },
   RTO: { variant: "danger", label: "RTO" },
   REFUNDED: { variant: "danger", label: "Refunded" },
+  REJECTED: { variant: "danger", label: "Rejected" },
+  DISCREPANCY: { variant: "danger", label: "Discrepancy" },
   CLOSED_LOST: { variant: "danger", label: "Closed Lost" },
+  EXPIRED: { variant: "neutral", label: "Expired" },
+  IGNORED: { variant: "neutral", label: "Ignored" },
 };
 
 const VARIANT_STYLES: Record<BadgeVariant, { bg: string; text: string; dot: string; border: string }> = {

@@ -16,6 +16,11 @@ export async function middleware(req: NextRequest) {
     targetUrl.search = req.nextUrl.search;
     return NextResponse.redirect(targetUrl);
   }
+  if (pathname.startsWith("/sales/payments")) {
+    const targetUrl = new URL(pathname.replace("/sales/payments", "/admin/payments"), req.url);
+    targetUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(targetUrl);
+  }
 
   // ── Admin route protection ──────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
@@ -57,5 +62,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/config/:path*", "/account/:path*", "/checkout/:path*"],
+  matcher: ["/admin/:path*", "/config/:path*", "/sales/:path*", "/account/:path*", "/checkout/:path*"],
 };
