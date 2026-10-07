@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { prisma } from "@/lib/db";
 import { authOptions } from "@/lib/nextauth";
 import { parseSpecs } from "@/lib/utils";
-import { productCardInclude, toProductCardData } from "@/lib/catalog";
+import { productCardInclude, toProductCardData, wishlistedProductIds } from "@/lib/catalog";
 import { stockStateFor } from "@/components/store/StockBadge";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
 import ProductGallery from "@/components/store/ProductGallery";
@@ -16,7 +16,8 @@ import SectionHeading from "@/components/store/SectionHeading";
 import TrustStrip from "@/components/store/TrustStrip";
 import WishlistButton from "@/components/store/WishlistButton";
 import ProductReviews from "@/components/store/ProductReviews";
-import { Star } from "lucide-react";
+import RatingStars from "@/components/store/RatingStars";
+import { ListChecks } from "lucide-react";
 
 export async function generateMetadata({
   params,
@@ -63,10 +64,17 @@ export default async function ProductPage({ params }: { params: { id: string } }
     }),
   ]);
 
+  const relatedWishlisted = await wishlistedProductIds(related.map((p) => p.id));
+
   const specs = parseSpecs(product.specs);
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
   const badge = stockStateFor(product.stockMode, product.isAvailable, totalStock);
   const isInquire = product.checkoutMode === "INQUIRE";
+  const avgRating =
+    reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : null;
+  // First handful of specs surfaced as "About this item" bullets, above the
+  // fold — the full table further down stays the source of truth.
+  const highlightSpecs = Object.entries(specs).slice(0, 4);
 
   return (
     <>
@@ -109,22 +117,25 @@ export default async function ProductPage({ params }: { params: { id: string } }
             {product.title}
           </h1>
 
-          {/* Rating Summary Star Pill */}
-          {reviews.length > 0 && (
-            <div className="flex items-center gap-2 mb-3">
-              <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-amber-800 font-bold text-xs font-mono">
-                <Star size={13} className="fill-amber-400 text-amber-400" />
-                <span>
-                  {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)}
-                </span>
-              </div>
-              <span className="text-xs text-slate-500">
-                ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
-              </span>
-            </div>
+          {/* Rating Summary */}
+          {avgRating != null && (
+            <RatingStars rating={avgRating} reviewCount={reviews.length} size={15} className="mb-3" />
           )}
 
-          <p className="text-sm text-slate-600 leading-relaxed mb-6">{product.description}</p>
+          <p className="text-sm text-slate-600 leading-relaxed mb-4">{product.description}</p>
+
+          {highlightSpecs.length > 0 && (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-6">
+              {highlightSpecs.map(([key, value]) => (
+                <li key={key} className="flex items-start gap-1.5 text-xs text-slate-700">
+                  <ListChecks size={14} className="text-brand-orange-600 flex-shrink-0 mt-0.5" />
+                  <span>
+                    <span className="font-semibold text-slate-900">{key}:</span> {value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {isInquire ? (
             <ProductInquiryBox
@@ -142,6 +153,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
                 id: v.id,
                 title: v.title,
                 price: v.price,
+                mrp: v.mrp,
                 stock: v.stock,
                 isAvailable: v.isAvailable,
               }))}
@@ -190,7 +202,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
             {related.map((item) => (
               <ProductCard
                 key={item.id}
-                product={toProductCardData(item)}
+                product={toProductCardData(item, { wishlisted: relatedWishlisted.has(item.id) })}
                 className="min-w-[220px] lg:min-w-0 snap-start"
               />
             ))}

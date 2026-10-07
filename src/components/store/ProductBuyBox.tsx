@@ -12,6 +12,7 @@ export type BuyBoxVariant = {
   id: string;
   title: string;
   price: number | null;
+  mrp: number | null;
   stock: number;
   isAvailable: boolean;
 };
@@ -19,12 +20,14 @@ export type BuyBoxVariant = {
 export default function ProductBuyBox({
   productId,
   basePrice,
+  baseMrp,
   variants,
   stockMode,
   isAvailable,
 }: {
   productId: string;
   basePrice: number;
+  baseMrp?: number | null;
   variants: BuyBoxVariant[];
   stockMode: string;
   isAvailable: boolean;
@@ -39,6 +42,7 @@ export default function ProductBuyBox({
 
   const selected = variants.find((v) => v.id === selectedId);
   const price = selected?.price ?? basePrice;
+  const mrp = selected?.mrp ?? baseMrp ?? null;
   const tracked = stockMode === "TRACKED";
   const maxQty = tracked && selected ? Math.max(1, selected.stock) : 99;
   const soldOut = !isAvailable || (tracked && selected ? selected.stock <= 0 : false);
@@ -101,6 +105,7 @@ export default function ProductBuyBox({
       <div className="bg-surface border border-border-base rounded-lg p-5">
         <PriceDisplay
           price={price}
+          mrp={mrp}
           size="display"
           note="Inclusive of all taxes · GST invoice available"
         />

@@ -20,6 +20,7 @@ interface ToastContextValue {
   success: (title: string, message?: string, undoAction?: () => void) => void;
   error: (title: string, message?: string) => void;
   info: (title: string, message?: string) => void;
+  addToast: (title: string, type?: ToastType) => void;
 }
 
 type ToastEvent = {
@@ -41,6 +42,9 @@ export const toast = {
   },
   info: (title: string, message?: string) => {
     listeners.forEach((fn) => fn({ type: "info", title, message }));
+  },
+  addToast: (title: string, type: ToastType = "info") => {
+    listeners.forEach((fn) => fn({ type, title }));
   },
 };
 
@@ -108,8 +112,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [showToast]
   );
 
+  const addToast = useCallback(
+    (title: string, type: ToastType = "info") => {
+      showToast({ type, title });
+    },
+    [showToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info }}>
+    <ToastContext.Provider value={{ showToast, success, error, info, addToast }}>
       {children}
       {/* Toast Container Top-Right */}
       <div

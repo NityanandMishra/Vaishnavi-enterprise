@@ -2,11 +2,12 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, ImageOff, Sun, Lightbulb, ClipboardList } from "lucide-react";
-import { productCardInclude, toProductCardData } from "@/lib/catalog";
+import { productCardInclude, toProductCardData, wishlistedProductIds } from "@/lib/catalog";
 import ProductCard from "@/components/store/ProductCard";
 import HeroCarousel from "@/components/store/HeroCarousel";
 import SectionHeading from "@/components/store/SectionHeading";
 import TrustStrip from "@/components/store/TrustStrip";
+import TestimonialStrip from "@/components/store/TestimonialStrip";
 
 /**
  * Solar section highlights, kept in step with /solar.
@@ -23,7 +24,7 @@ const solarHighlights = [
 ];
 
 export default async function HomePage() {
-  const [topCategories, bestSellers] = await Promise.all([
+  const [topCategories, bestSellers, topReviewed, testimonials] = await Promise.all([
     prisma.category.findMany({
       where: { parentId: null },
       orderBy: { sortOrder: "asc" },
@@ -36,7 +37,33 @@ export default async function HomePage() {
       take: 8,
       include: productCardInclude,
     }),
+    // Candidate pool for "Customer Favourites" — ratings aren't a stored,
+    // sortable column, so the top 40 recently-reviewed products are pulled
+    // and re-ranked by their real average in JS below.
+    prisma.product.findMany({
+      where: { isAvailable: true, reviews: { some: { status: "APPROVED", deletedAt: null } } },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      include: productCardInclude,
+    }),
+    prisma.review.findMany({
+      where: { status: "APPROVED", deletedAt: null, rating: { gte: 4 } },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      include: { user: { select: { name: true } }, product: { select: { title: true } } },
+    }),
   ]);
+
+  const wishlisted = await wishlistedProductIds([
+    ...bestSellers.map((p) => p.id),
+    ...topReviewed.map((p) => p.id),
+  ]);
+
+  const customerFavourites = topReviewed
+    .map((p) => toProductCardData(p, { wishlisted: wishlisted.has(p.id) }))
+    .filter((p) => (p.reviewCount ?? 0) > 0 && (p.rating ?? 0) >= 4)
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (b.reviewCount ?? 0) - (a.reviewCount ?? 0))
+    .slice(0, 4);
 
   return (
     <>
@@ -94,9 +121,28 @@ export default async function HomePage() {
             {bestSellers.slice(0, 8).map((product) => (
               <ProductCard
                 key={product.id}
-                product={toProductCardData(product)}
+                product={toProductCardData(product, { wishlisted: wishlisted.has(product.id) })}
                 className="min-w-[220px] lg:min-w-0 snap-start"
               />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Customer Favourites ──────────────────────────────────────── */}
+      {customerFavourites.length > 0 && (
+        <section className="pt-12 lg:pt-16">
+          <div className="max-w-content mx-auto px-4 lg:px-8">
+            <SectionHeading
+              title="Customer Favourites"
+              hint="Top rated"
+              actionLabel="View All"
+              actionHref="/search?sort=newest"
+            />
+          </div>
+          <div className="max-w-content mx-auto px-4 lg:px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {customerFavourites.map((product) => (
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </section>
@@ -152,6 +198,16 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── What Customers Say ──────────────────────────────────────────── */}
+      {testimonials.length > 0 && (
+        <section className="pt-12 lg:pt-16">
+          <div className="max-w-content mx-auto px-4 lg:px-8">
+            <SectionHeading title="What Customers Say" />
+          </div>
+          <TestimonialStrip testimonials={testimonials} />
+        </section>
+      )}
 
       {/* ── About ────────────────────────────────────────────────────── */}
       <section className="max-w-content mx-auto px-4 lg:px-8 pt-12 lg:pt-16 pb-4">

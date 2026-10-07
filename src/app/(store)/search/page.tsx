@@ -8,7 +8,7 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
-
+  wishlistedProductIds,
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
@@ -63,6 +63,8 @@ export default async function SearchPage({
     count: b._count.products,
   }));
 
+  const wishlisted = await wishlistedProductIds(products.map((p) => p.id));
+
   const hasMore = totalCount > products.length;
   const nextShowParams = new URLSearchParams(
     Object.entries(searchParams).filter(([, v]) => typeof v === "string") as [string, string][]
@@ -101,7 +103,10 @@ export default async function SearchPage({
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={toProductCardData(product)} />
+                  <ProductCard
+                    key={product.id}
+                    product={toProductCardData(product, { wishlisted: wishlisted.has(product.id) })}
+                  />
                 ))}
               </div>
 

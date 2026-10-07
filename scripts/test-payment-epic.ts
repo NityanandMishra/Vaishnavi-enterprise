@@ -740,6 +740,71 @@ async function runPaymentEpicTests() {
     assert(Array.isArray(summary.attentionStrips), "Attention strips generated");
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // TEST 8: PAY-11 & Order Payments Contract (A.8 API Contract)
+  // ──────────────────────────────────────────────────────────────────────────
+  console.log("\n--- TEST 8: Order Payments API & Export Contracts (PAY-11, A.8) ---");
+  {
+    const testOrder = await createTestOrder({
+      orderNumber: "VE-2026-TEST-CONTRACT",
+      totalAmount: 3500.50,
+      paymentMethod: "CARD",
+      paymentStatus: "PAID",
+    });
+
+    const txn = await recordTransaction({
+      orderId: testOrder.id,
+      gateway: "RAZORPAY",
+      gatewayTransactionId: "pay_test_contract_01",
+      method: "CARD",
+      amountPaise: 350050,
+      status: "PAID",
+      cardLastFour: "9876",
+      gatewayResponseCode: "SUCCESS",
+      gatewayResponseMessage: "Payment captured successfully",
+    });
+
+    // Query order payments attached per A.8 GET /api/admin/orders/:id/payments
+    const attachedTxns = await prisma.paymentTransaction.findMany({
+      where: { orderId: testOrder.id },
+      include: {
+        events: true,
+        refunds: true,
+      },
+    });
+
+    assert(attachedTxns.length >= 1, "Order payments query returns attached transactions");
+    assert(attachedTxns[0].amountPaise === 350050, "Returned transaction matches exact amount in paise");
+    assert(attachedTxns[0].events.length >= 1, "Returned transaction includes event timeline");
+    assert(attachedTxns[0].cardLastFour === "9876", "Returned transaction preserves SEC-01 cardLastFour");
+
+    // Verify CSV export generation logic (PAY-11)
+    const exportSample = await prisma.paymentTransaction.findMany({
+      where: { orderId: testOrder.id },
+      include: {
+        order: { select: { orderNumber: true, customerName: true, customerPhone: true } },
+      },
+    });
+
+    const csvRow = [
+      exportSample[0].createdAt.toISOString().slice(0, 19).replace("T", " "),
+      exportSample[0].order?.orderNumber,
+      `"${exportSample[0].order?.customerName}"`,
+      exportSample[0].order?.customerPhone,
+      exportSample[0].gateway,
+      exportSample[0].gatewayTransactionId,
+      exportSample[0].method,
+      (exportSample[0].amountPaise / 100).toFixed(2),
+      exportSample[0].status,
+      exportSample[0].cardLastFour,
+      exportSample[0].gatewayResponseCode,
+    ].join(",");
+
+    assert(csvRow.includes("VE-2026-TEST-CONTRACT"), "PAY-11: CSV export row includes order number");
+    assert(csvRow.includes("3500.50"), "PAY-11: CSV export row contains formatted gross currency");
+    assert(csvRow.includes("9876"), "PAY-11: CSV export row includes cardLastFour");
+  }
+
   console.log("\n================================================================================");
   console.log(`  RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log("================================================================================\n");

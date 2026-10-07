@@ -4,16 +4,24 @@ import { ImageOff, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PriceDisplay from "./PriceDisplay";
 import StockBadge, { type StockState } from "./StockBadge";
+import RatingStars from "./RatingStars";
+import WishlistHeartButton from "./WishlistHeartButton";
 
 export type ProductCardData = {
   id: string;
   title: string;
   basePrice: number;
+  mrp?: number | null;
   checkoutMode: string;
   brandName?: string | null;
   imageUrl?: string | null;
   imageAlt?: string | null;
   badge?: StockState;
+  rating?: number | null;
+  reviewCount?: number;
+  /** Set only when stock has dropped low enough to justify urgency copy. */
+  lowStockCount?: number | null;
+  wishlisted?: boolean;
 };
 
 type CardAction = "add-to-cart" | "move-to-cart" | "none";
@@ -28,11 +36,15 @@ export default function ProductCard({
   className?: string;
 }) {
   const isInquire = product.checkoutMode === "INQUIRE";
+  const hasDiscount = typeof product.mrp === "number" && product.mrp > product.basePrice;
+  const discountPct = hasDiscount
+    ? Math.round(((product.mrp! - product.basePrice) / product.mrp!) * 100)
+    : 0;
 
   return (
     <div
       className={cn(
-        "group relative flex flex-col bg-surface border border-border-base rounded-lg p-4 transition-shadow hover:shadow-md",
+        "group relative flex flex-col bg-surface border border-border-base rounded-lg p-4 transition-all hover:shadow-lg hover:-translate-y-0.5",
         className
       )}
     >
@@ -58,8 +70,13 @@ export default function ProductCard({
             so the brand line starts at the same x on every card in a grid.
             The row keeps its height when a badge is missing to stop cards
             shifting relative to one another. */}
-        <div className="flex items-center min-h-[23px] mb-1.5">
+        <div className="flex items-center gap-2 min-h-[23px] mb-1.5">
           {product.badge && <StockBadge state={product.badge} />}
+          {product.lowStockCount && (
+            <span className="text-[11px] font-bold text-danger">
+              Only {product.lowStockCount} left
+            </span>
+          )}
         </div>
 
         {product.brandName && (
@@ -67,16 +84,33 @@ export default function ProductCard({
             {product.brandName}
           </p>
         )}
-        <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2 group-hover:text-brand-orange-600 transition-colors">
+        <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-1.5 group-hover:text-brand-orange-600 transition-colors">
           {product.title}
         </h3>
+
+        {!!product.reviewCount && product.rating != null && (
+          <RatingStars rating={product.rating} reviewCount={product.reviewCount} className="mb-2" />
+        )}
       </Link>
+
+      {/* Overlays — siblings of the link, not descendants, so a tap on either
+          never also triggers navigation to the product page. */}
+      {hasDiscount && (
+        <span className="absolute top-3 left-3 z-10 inline-flex items-center rounded-sm bg-danger px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+          {discountPct}% OFF
+        </span>
+      )}
+      <WishlistHeartButton
+        productId={product.id}
+        initiallySaved={product.wishlisted ?? false}
+        className="absolute top-3 right-3 z-10"
+      />
 
       <div className="mt-auto pt-1">
         {isInquire ? (
           <p className="text-lg font-bold text-slate-900">Pricing on Inquiry</p>
         ) : (
-          <PriceDisplay price={product.basePrice} />
+          <PriceDisplay price={product.basePrice} mrp={product.mrp} />
         )}
 
         {action !== "none" && (

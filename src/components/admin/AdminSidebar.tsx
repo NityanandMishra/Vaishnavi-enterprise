@@ -112,6 +112,7 @@ export default function AdminSidebar({
         { href: "/admin/coupons", label: "Coupons", icon: Tag },
         { href: "/admin/payments", label: "Payments", icon: CreditCard },
         { href: "/admin/shipments", label: "Shipments", icon: Truck },
+        { href: "/admin/shipments/stuck", label: "Stuck Shipments", icon: AlertTriangle, badge: "Queue", badgeVariant: "warning" },
       ],
     },
     {
@@ -120,7 +121,9 @@ export default function AdminSidebar({
       items: [
         { href: "/admin/units", label: "Units & Measures", icon: Scale },
         { href: "/admin/tax", label: "Tax & HSN", icon: FileText },
-        { href: "/admin/shipping-zones", label: "Shipping Zones", icon: MapPin },
+        { href: "/admin/shipping/zones", label: "Shipping Zones", icon: MapPin },
+        { href: "/admin/shipping/couriers", label: "Couriers", icon: Truck },
+        { href: "/admin/shipping/calculator", label: "Rate Calculator", icon: Scale },
       ],
     },
   ];

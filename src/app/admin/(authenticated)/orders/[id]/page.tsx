@@ -30,6 +30,7 @@ import {
 import { formatINR } from "@/lib/utils";
 import CancelOrderModal from "@/components/admin/orders/CancelOrderModal";
 import EditAddressDrawer from "@/components/admin/orders/EditAddressDrawer";
+import CreateShipmentDrawer from "@/components/admin/shipping/CreateShipmentDrawer";
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -1018,74 +1019,16 @@ export default function OrderDetailPage() {
         }}
       />
 
-      {/* CREATE SHIPMENT MODAL (PACKED -> SHIPPED Dispatch Action) */}
-      {isShipmentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h3 className="text-base font-bold text-slate-900">Create & Dispatch Shipment</h3>
-              <button
-                onClick={() => setIsShipmentModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleDispatchShipment} className="space-y-4 text-xs">
-              <p className="text-slate-600">
-                Dispatching this shipment will automatically transition the order to{" "}
-                <strong className="text-slate-900">SHIPPED</strong>, consume reserved stock via INV-04,
-                and generate the official GST invoice.
-              </p>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Courier Partner</label>
-                <select
-                  value={courier}
-                  onChange={(e) => setCourier(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-hidden"
-                >
-                  <option value="Delhivery">Delhivery</option>
-                  <option value="Blue Dart">Blue Dart</option>
-                  <option value="India Post">India Post</option>
-                  <option value="Shadowfax">Shadowfax</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">AWB / Tracking Number</label>
-                <input
-                  type="text"
-                  required
-                  value={awb}
-                  onChange={(e) => setAwb(e.target.value)}
-                  placeholder="e.g. 1234567890123"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono text-slate-900 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsShipmentModalOpen(false)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={dispatchingLoading || !awb.trim()}
-                  className="rounded-lg bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {dispatchingLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-                  <span>Dispatch & Ship</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* S2 CREATE SHIPMENT DRAWER (PACKED -> SHIPPED Dispatch Action) */}
+      <CreateShipmentDrawer
+        isOpen={isShipmentModalOpen}
+        onClose={() => setIsShipmentModalOpen(false)}
+        order={order}
+        onSuccess={() => {
+          setIsShipmentModalOpen(false);
+          fetchOrder();
+        }}
+      />
 
       {/* LINE CANCELLATION MODAL (ORD-05) */}
       {cancellingLine && (

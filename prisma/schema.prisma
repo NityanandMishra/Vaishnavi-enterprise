@@ -491,6 +491,7 @@ model Order {
   transactions  PaymentTransaction[]
   refunds       Refund[]
   codCollection CodCollection?
+  shipments     Shipment[]
 
   @@index([status, placedAt])
   @@index([slaDueAt])
@@ -527,6 +528,7 @@ model OrderItem {
   product     Product               @relation(fields: [productId], references: [id])
   variant     ProductVariant?       @relation(fields: [variantId], references: [id], onDelete: SetNull)
   adjustments OrderLineAdjustment[]
+  shipmentLines ShipmentLine[]
 
   @@index([orderId])
   @@index([sku])
@@ -1104,6 +1106,258 @@ model PaymentSettings {
   codAutoDiscrepancyHours Int      @default(48)      // Hours before delivered without cash flags discrepancy
   updatedAt               DateTime @updatedAt
   updatedBy               String?
+}
+
+// ─── EPIC-07: SHIPPING & LOGISTICS (SHIP) ────────────────────────────────────
+
+// ─── SHIPPING ZONES (FR-01, FR-02, FR-03) ────────────────────────────────────
+model ShippingZone {
+  id         String    @id @default(uuid())
+  name       String
+  isFallback Boolean   @default(false) // Exactly one fallback ("Rest of India")
+  priority   Int       @default(0)     // Display order / resolution preference
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  rules     ZoneRule[]
+  rates     ShippingRate[]
+  costRates CourierCostRate[]
+
+  @@index([isFallback])
+  @@index([isActive])
+}
+
+// ─── ZONE RULES (SPECIFICITY HIERARCHY — FR-01, FR-02, SHIP-01) ──────────────
+// matchType: "PINCODE" (spec=4) | "PINCODE_RANGE" (spec=3) | "STATE" (spec=2) | "REGION" (spec=1)
+model ZoneRule {
+  id          String   @id @default(uuid())
+  zoneId      String
+  matchType   String   // "PINCODE" | "PINCODE_RANGE" | "STATE" | "REGION"
+  pincode     String?  // Exact 6-digit pincode
+  pincodeFrom String?  // Range start
+  pincodeTo   String?  // Range end
+  stateCode   String?  // e.g. "27" (Maharashtra)
+  region      String?  // "NORTH" | "SOUTH" | "EAST" | "WEST" | "NORTH_EAST" | "CENTRAL"
+  specificity Int      // 4=pincode, 3=range, 2=state, 1=region (higher wins)
+  createdAt   DateTime @default(now())
+
+  zone ShippingZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+  @@index([matchType, pincode])
+  @@index([matchType, stateCode])
+  @@index([specificity])
+}
+
+// ─── SHIPPING RATES PER ZONE (FR-04, FR-06, FR-07, SHIP-02) ──────────────────
+// rateType: "FLAT" | "WEIGHT_SLAB" | "VALUE_SLAB" | "FREE_ABOVE"
+model ShippingRate {
+  id                  String   @id @default(uuid())
+  zoneId              String
+  rateType            String   // "FLAT" | "WEIGHT_SLAB" | "VALUE_SLAB" | "FREE_ABOVE"
+  flatAmountPaise     Int?     // For FLAT rate
+  freeAbovePaise      Int?     // Order value threshold for free shipping (evaluated post-discount)
+  codSurchargePaise   Int?     // Flat COD fee in integer paise
+  codSurchargePercent Float?   // Percentage COD fee
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  zone  ShippingZone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  slabs ShippingRateSlab[]
+
+  @@index([zoneId, isActive])
+}
+
+// ─── SHIPPING RATE SLABS (CONTIGUOUS WEIGHT/VALUE SLABS — FR-05) ─────────────
+model ShippingRateSlab {
+  id                       String @id @default(uuid())
+  shippingRateId           String
+  minWeightGrams           Int?   // Lower bound weight in grams
+  maxWeightGrams           Int?   // Upper bound (null = open-ended final slab)
+  minValuePaise            Int?   // Lower bound order value in paise
+  maxValuePaise            Int?   // Upper bound (null = open-ended final slab)
+  amountPaise              Int    // Charge for this slab
+  perAdditionalWeightGrams Int?   // e.g. 500g above 1kg
+  perAdditionalAmountPaise Int?   // e.g. ₹20 (2000 paise) per increment
+
+  shippingRate ShippingRate @relation(fields: [shippingRateId], references: [id], onDelete: Cascade)
+
+  @@index([shippingRateId])
+}
+
+// ─── COURIERS (FR-09, FR-10, FR-13, SHIP-04) ─────────────────────────────────
+// integrationMode: "API" | "MANUAL"
+model Courier {
+  id              String   @id @default(uuid())
+  name            String   // e.g. "Delhivery", "Blue Dart", "India Post"
+  code            String   @unique // e.g. "DLV", "BDT", "IPO"
+  integrationMode String   @default("API") // "API" | "MANUAL"
+  credentialsKey  String?  // Env var reference only, never raw secrets (FR-10)
+  supportsCod     Boolean  @default(true)
+  supportsReverse Boolean  @default(true)
+  priority        Int      @default(1) // Lower number = higher priority default
+  isActive        Boolean  @default(true)
+  lastApiStatus   String?  // "HEALTHY" | "FAILED" | "UNTESTED"
+  lastApiError    String?
+  lastApiCheckedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  serviceability CourierServiceability[]
+  costRates      CourierCostRate[]
+  shipments      Shipment[]
+  manifests      Manifest[]
+
+  @@index([priority, isActive])
+}
+
+// ─── COURIER SERVICEABILITY (PINCODE MAPPING — FR-11, FR-12) ──────────────────
+model CourierServiceability {
+  id          String   @id @default(uuid())
+  courierId   String
+  pincode     String   // 6-digit pincode
+  supportsCod Boolean  @default(true)
+  transitDays Int      @default(3)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courier Courier @relation(fields: [courierId], references: [id], onDelete: Cascade)
+
+  @@unique([courierId, pincode])
+  @@index([pincode])
+  @@index([courierId, isActive])
+}
+
+// ─── COURIER COST RATES (INTERNAL COURIER EXPENSE — NOT CUSTOMER CHARGE) ──────
+model CourierCostRate {
+  id             String    @id @default(uuid())
+  courierId      String
+  zoneId         String?   // null = all zones
+  minWeightGrams Int       @default(0)
+  maxWeightGrams Int?      // null = no upper limit
+  costPaise      Int       // What courier charges us (in integer paise)
+  codFeePaise    Int       @default(0)
+  transitDays    Int       @default(3)
+  effectiveFrom  DateTime  @default(now())
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  courier Courier       @relation(fields: [courierId], references: [id], onDelete: Cascade)
+  zone    ShippingZone? @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([courierId, zoneId])
+}
+
+// ─── SHIPMENTS (THE TRACKABLE PHYSICAL PARCEL — FR-14 TO FR-23) ──────────────
+// status: "PENDING" | "READY_TO_SHIP" | "DISPATCHED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED_DELIVERY" | "RTO" | "RTO_DELIVERED"
+model Shipment {
+  id                     String    @id @default(uuid())
+  orderId                String
+  shipmentNumber         String    @unique // e.g. "SHP-2026-0001"
+  sellerId               String?   // House seller default (D-02)
+  courierId              String
+  awbNumber              String?   // Tracking / AWB code
+  labelUrl               String?   // Stored PDF / thermal label URL
+  estimatedCostPaise     Int?      // Our internal cost with this courier at booking
+  actualCostPaise        Int?      // Reconciled later against invoice
+  status                 String    @default("PENDING")
+  weightGrams            Int       // Packed physical weight in grams
+  declaredValuePaise     Int       // Declared parcel value in paise
+  shippingChargePaise    Int       // Customer-paid shipping charge (frozen at placement)
+  codAmountPaise         Int       @default(0) // Fixed to order total for COD orders
+  pickupScheduledAt      DateTime?
+  dispatchedAt           DateTime?
+  deliveredAt            DateTime?
+  expectedDeliveryDate   DateTime?
+  attemptCount           Int       @default(0)
+  lastEventAt            DateTime?
+  lastEventDescription   String?
+  lastEventLocation      String?
+  isStuck                Boolean   @default(false) // Idle for > 48h (configurable)
+  rtoReason              String?
+  rtoReceivedAt          DateTime?
+  returnShippingCostPaise Int?
+  createdBy              String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  version                Int       @default(1)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courier Courier         @relation(fields: [courierId], references: [id])
+  lines   ShipmentLine[]
+  events  ShipmentEvent[]
+
+  @@unique([courierId, awbNumber])
+  @@index([orderId])
+  @@index([status, lastEventAt])
+  @@index([isStuck])
+}
+
+// ─── SHIPMENT LINES (SUPPORTS PARTIAL & MULTI-PARCEL — FR-14, FR-15, SHIP-06) ─
+model ShipmentLine {
+  id          String @id @default(uuid())
+  shipmentId  String
+  orderLineId String
+  quantity    Int    // Quantity in this specific shipment
+
+  shipment  Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderLine OrderItem @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@index([orderLineId])
+}
+
+// ─── SHIPMENT EVENTS (APPEND-ONLY TRACKING MIRROR — FR-20, SHIP-07) ───────────
+// source: "COURIER_WEBHOOK" | "COURIER_POLL" | "MANUAL"
+model ShipmentEvent {
+  id                String   @id @default(uuid())
+  shipmentId        String
+  status            String   // Mirrored shipment status
+  courierStatusCode String?  // Raw status code from courier
+  description       String   // e.g. "In Transit · Nagpur"
+  location          String?  // e.g. "Nagpur"
+  eventAt           DateTime @default(now())
+  source            String   // "COURIER_WEBHOOK" | "COURIER_POLL" | "MANUAL"
+  rawPayload        String?  // Stored JSON string
+  createdBy         String?  // User ID if MANUAL
+  createdByName     String?  // e.g. "Amrit Suthar" (SHIP-07)
+  createdAt         DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, eventAt])
+}
+
+// ─── MANIFESTS (COURIER HANDOVER SHEETS — FR-25, SHIP-12) ────────────────────
+model Manifest {
+  id            String   @id @default(uuid())
+  manifestNumber String  @unique // e.g. "MAN-2026-0001"
+  courierId     String
+  manifestDate  DateTime @default(now())
+  shipmentCount Int      @default(0)
+  pdfUrl        String?
+  createdBy     String?
+  createdByName String?
+  createdAt     DateTime @default(now())
+
+  courier Courier @relation(fields: [courierId], references: [id])
+
+  @@index([courierId, manifestDate])
+}
+
+// ─── SHIPPING SETTINGS (CONFIGURABLE STUCK WINDOW & FALLBACKS) ───────────────
+model ShippingSettings {
+  id                   String   @id @default("default")
+  stuckThresholdHours  Int      @default(48) // Hours of inactivity before flagging stuck (SHIP-09)
+  defaultWeightGrams   Int      @default(500)
+  houseSellerId        String?  // Default seller for waybills
+  updatedAt            DateTime @updatedAt
+  updatedBy            String?
 }
 
 

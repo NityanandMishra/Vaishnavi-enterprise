@@ -41,7 +41,7 @@ export default async function WishlistPage() {
           {items.map((item) => (
             <ProductCard
               key={item.id}
-              product={toProductCardData(item.product)}
+              product={toProductCardData(item.product, { wishlisted: true })}
               action="move-to-cart"
             />
           ))}

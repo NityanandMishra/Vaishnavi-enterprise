@@ -9,6 +9,7 @@ import {
   catalogOrderBy,
   catalogTake,
   brandFilter,
+  wishlistedProductIds,
   PAGE_SIZE,
   type CatalogSearchParams,
 } from "@/lib/catalog";
@@ -98,6 +99,8 @@ export default async function CategoryPage({
     // explicit so a brand can never render a "0" facet.
     .filter((b) => b.count > 0);
 
+  const wishlisted = await wishlistedProductIds(products.map((p) => p.id));
+
   const hasMore = totalCount > products.length;
   const nextShowParams = new URLSearchParams(
     Object.entries(searchParams).filter(([, v]) => typeof v === "string") as [string, string][]
@@ -184,7 +187,10 @@ export default async function CategoryPage({
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                 {products.map((product) => (
-                  <ProductCard key={product.id} product={toProductCardData(product)} />
+                  <ProductCard
+                    key={product.id}
+                    product={toProductCardData(product, { wishlisted: wishlisted.has(product.id) })}
+                  />
                 ))}
               </div>
 
