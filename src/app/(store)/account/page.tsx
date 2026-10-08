@@ -56,7 +56,7 @@ export default async function AccountPage({
   if (!user) redirect("/auth/login?callbackUrl=/account");
 
   return (
-    <div className="max-w-content mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-4">
+    <div className="wrap pt-6 pb-16">
       {/* Profile header */}
       <div className="bg-surface border border-border-base rounded-lg p-5 lg:p-6 flex items-center gap-4 mb-6">
         <div className="w-16 h-16 flex-shrink-0 rounded-full bg-surface-sunken flex items-center justify-center">

@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { SlidersHorizontal, ArrowUpDown, Check } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Modal from "@/components/ui/Modal";
-import ComingSoonTag from "./ComingSoonTag";
 
 export const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
@@ -16,7 +14,17 @@ export const SORT_OPTIONS = [
 
 export type BrandOption = { id: string; name: string; count: number };
 
-export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
+/**
+ * Category Listing Controls & Sidebar Facets (§6.2)
+ *
+ * Desktop (≥1024px): 264px sticky sidebar with facet groups (Brand, Availability, Sort).
+ * Mobile (<1024px): Dual action bar (Filter | Sort By) opening bottom drawer sheet.
+ */
+export default function CatalogControls({
+  brands,
+}: {
+  brands: BrandOption[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -24,6 +32,7 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
 
   const activeSort = searchParams.get("sort") ?? "newest";
   const activeBrands = (searchParams.get("brand") ?? "").split(",").filter(Boolean);
+  const activeAvail = searchParams.get("avail") ?? ""; // "stock" | "ask" | ""
 
   function apply(next: URLSearchParams) {
     next.delete("show");
@@ -49,52 +58,77 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
     apply(next);
   }
 
+  function toggleAvail(val: "stock" | "ask") {
+    const next = new URLSearchParams(searchParams.toString());
+    if (activeAvail === val) {
+      next.delete("avail");
+    } else {
+      next.set("avail", val);
+    }
+    apply(next);
+  }
+
   function clearFilters() {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("brand");
+    next.delete("avail");
     apply(next);
     setSheet(null);
   }
 
-  const filterCount = activeBrands.length;
+  const filterCount = activeBrands.length + (activeAvail ? 1 : 0);
 
   return (
     <>
-      {/* Mobile trigger bar — matches the wireframe's FILTER | SORT BY split */}
-      <div className="lg:hidden grid grid-cols-2 bg-surface border-y border-border-base sticky top-16 z-30">
+      {/* ── Mobile Trigger Bar (<1024px) ───────────────────────────────── */}
+      <div className="lg:hidden grid grid-cols-2 bg-[var(--surface)] border-y border-[var(--line)] sticky top-[var(--hdr)] z-30">
         <button
           onClick={() => setSheet("filter")}
-          className="flex items-center justify-center gap-2 min-h-[48px] text-sm font-semibold uppercase tracking-wide text-slate-900 hover:bg-surface-alt transition-colors"
+          className="flex items-center justify-center gap-2 min-h-[48px] text-sm font-semibold uppercase tracking-wider text-[var(--fg)] hover:bg-[var(--mortar)] transition-colors"
         >
           <SlidersHorizontal size={16} />
-          Filter
+          <span>Filters</span>
           {filterCount > 0 && (
-            <span className="ml-1 w-5 h-5 rounded-full bg-brand-orange-600 text-white text-[11px] font-bold flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-[var(--accent)] text-white text-[11px] font-bold flex items-center justify-center">
               {filterCount}
             </span>
           )}
         </button>
         <button
           onClick={() => setSheet("sort")}
-          className="flex items-center justify-center gap-2 min-h-[48px] text-sm font-semibold uppercase tracking-wide text-slate-900 border-l border-border-base hover:bg-surface-alt transition-colors"
+          className="flex items-center justify-center gap-2 min-h-[48px] text-sm font-semibold uppercase tracking-wider text-[var(--fg)] border-l border-[var(--line)] hover:bg-[var(--mortar)] transition-colors"
         >
           <ArrowUpDown size={16} />
-          Sort By
+          <span>Sort By</span>
         </button>
       </div>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:block w-60 flex-shrink-0">
-        <div className="sticky top-24 space-y-6">
-          <div>
-            <label htmlFor="sort-select" className="block text-xs font-bold uppercase tracking-wider text-muted mb-2">
+      {/* ── Desktop Sticky Sidebar (≥1024px, 264px width) ───────────────── */}
+      <aside className="hidden lg:block w-[264px] flex-shrink-0">
+        <div className="sticky top-24 space-y-6 p-5 rounded bg-[var(--surface)] border border-[var(--line)]">
+          {/* Header & Reset */}
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--line-soft)]">
+            <h3 className="font-bold text-sm uppercase tracking-wider text-[var(--fg)]">Filters</h3>
+            {filterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-[var(--accent-ink)] font-semibold hover:underline"
+              >
+                Clear all ({filterCount})
+              </button>
+            )}
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div className="fld">
+            <label htmlFor="sort-desktop" className="text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">
               Sort By
             </label>
             <select
-              id="sort-select"
+              id="sort-desktop"
               value={activeSort}
               onChange={(e) => setSort(e.target.value)}
-              className="w-full min-h-[44px] px-3 bg-surface border border-border-base rounded-md text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="inp text-sm"
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -104,137 +138,164 @@ export default function CatalogControls({ brands }: { brands: BrandOption[] }) {
             </select>
           </div>
 
+          {/* Availability Facet (§6.2: exactly two options) */}
+          <div className="space-y-3 pt-3 border-t border-[var(--line-soft)]">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">
+              Availability
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2.5 text-sm text-[var(--fg)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={activeAvail === "stock"}
+                  onChange={() => toggleAvail("stock")}
+                  className="w-4 h-4 rounded text-[var(--accent)] border-[var(--line)] focus:ring-[var(--accent)]"
+                />
+                <span className="font-medium">In stock now</span>
+              </label>
+
+              <label className="flex items-center gap-2.5 text-sm text-[var(--fg)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={activeAvail === "ask"}
+                  onChange={() => toggleAvail("ask")}
+                  className="w-4 h-4 rounded text-[var(--accent)] border-[var(--line)] focus:ring-[var(--accent)]"
+                />
+                <span className="font-medium">Order to size</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Brand Facet */}
           {brands.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Brand</h3>
-                {filterCount > 0 && (
-                  <button onClick={clearFilters} className="text-xs font-medium text-brand-orange-600 hover:underline">
-                    Clear
-                  </button>
-                )}
+            <div className="space-y-3 pt-3 border-t border-[var(--line-soft)]">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">
+                Brand / Manufacturer
+              </label>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {brands.map((b) => (
+                  <label
+                    key={b.id}
+                    className="flex items-center justify-between text-sm text-[var(--fg)] cursor-pointer select-none py-0.5"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={activeBrands.includes(b.id)}
+                        onChange={() => toggleBrand(b.id)}
+                        className="w-4 h-4 rounded text-[var(--accent)] border-[var(--line)] focus:ring-[var(--accent)]"
+                      />
+                      <span className="truncate">{b.name}</span>
+                    </div>
+                    <span className="text-xs text-[var(--fg-quiet)] ml-2">({b.count})</span>
+                  </label>
+                ))}
               </div>
-              <ul className="space-y-1">
-                {brands.map((b) =>
-                  b.count === 0 ? (
-                    // Listed so the brand is visible, but not selectable —
-                    // ticking it could only ever return nothing.
-                    <li
-                      key={b.id}
-                      title="No products listed yet"
-                      className="flex items-center gap-2.5 py-2 px-2 -mx-2 text-sm text-muted"
-                    >
-                      <span className="w-4 h-4 rounded border border-dashed border-border-base flex-shrink-0" />
-                      <span className="flex-1 truncate">{b.name}</span>
-                      <ComingSoonTag />
-                    </li>
-                  ) : (
-                    <li key={b.id}>
-                      <button
-                        onClick={() => toggleBrand(b.id)}
-                        className="w-full flex items-center gap-2.5 py-2 px-2 -mx-2 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
-                      >
-                        <span
-                          className={cn(
-                            "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0",
-                            activeBrands.includes(b.id)
-                              ? "bg-slate-900 border-slate-900"
-                              : "border-border-base bg-surface"
-                          )}
-                        >
-                          {activeBrands.includes(b.id) && <Check size={12} className="text-white" />}
-                        </span>
-                        <span className="flex-1 truncate">{b.name}</span>
-                        <span className="text-xs text-muted">{b.count}</span>
-                      </button>
-                    </li>
-                  )
-                )}
-              </ul>
             </div>
           )}
         </div>
       </aside>
 
-      {/* Mobile bottom sheet */}
-      <Modal
-        open={sheet !== null}
-        onClose={() => setSheet(null)}
-        title={sheet === "filter" ? "Filter" : "Sort By"}
-        variant="sheet"
-        className="lg:hidden"
-      >
-        <div className="p-4 pb-8">
-              {sheet === "sort" ? (
-                <ul className="space-y-1">
-                  {SORT_OPTIONS.map((o) => (
-                    <li key={o.value}>
-                      <button
-                        onClick={() => setSort(o.value)}
-                        className={cn(
-                          "w-full flex items-center justify-between min-h-[48px] px-3 rounded-md text-left text-sm transition-colors",
-                          activeSort === o.value
-                            ? "bg-surface-alt font-bold text-slate-900"
-                            : "text-slate-700 hover:bg-surface-alt"
-                        )}
-                      >
-                        {o.label}
-                        {activeSort === o.value && <Check size={18} className="text-brand-orange-600" />}
-                      </button>
-                    </li>
+      {/* ── Mobile Filter Bottom Sheet ─────────────────────────────────── */}
+      {sheet === "filter" && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end lg:hidden">
+          <div className="bg-[var(--surface)] w-full max-h-[85vh] rounded-t-xl p-6 overflow-y-auto animate-in slide-in-from-bottom flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--line)] mb-4">
+              <h3 className="font-bold text-base text-[var(--fg)]">Filters</h3>
+              <button onClick={() => setSheet(null)} className="ib" aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Availability */}
+            <div className="mb-6">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--fg-quiet)] mb-3">
+                Availability
+              </h4>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleAvail("stock")}
+                  className={cn("tag", activeAvail === "stock" && "active")}
+                  aria-pressed={activeAvail === "stock"}
+                >
+                  In stock now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleAvail("ask")}
+                  className={cn("tag", activeAvail === "ask" && "active")}
+                  aria-pressed={activeAvail === "ask"}
+                >
+                  Order to size
+                </button>
+              </div>
+            </div>
+
+            {/* Brands */}
+            {brands.length > 0 && (
+              <div className="mb-6">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--fg-quiet)] mb-3">
+                  Brand
+                </h4>
+                <div className="space-y-3">
+                  {brands.map((b) => (
+                    <label key={b.id} className="flex items-center justify-between py-1 text-sm">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={activeBrands.includes(b.id)}
+                          onChange={() => toggleBrand(b.id)}
+                          className="w-5 h-5 rounded text-[var(--accent)]"
+                        />
+                        <span className="font-medium text-[var(--fg)]">{b.name}</span>
+                      </div>
+                      <span className="text-xs text-[var(--fg-quiet)]">({b.count})</span>
+                    </label>
                   ))}
-                </ul>
-              ) : brands.length === 0 ? (
-                <p className="text-sm text-slate-600 py-4">No brands available for this selection.</p>
-              ) : (
-                <>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Brand</h3>
-                  <ul className="space-y-1">
-                    {brands.map((b) =>
-                      b.count === 0 ? (
-                        <li
-                          key={b.id}
-                          className="flex items-center gap-3 min-h-[48px] px-3 -mx-1 text-sm text-muted"
-                        >
-                          <span className="w-5 h-5 rounded border border-dashed border-border-base flex-shrink-0" />
-                          <span className="flex-1">{b.name}</span>
-                          <ComingSoonTag />
-                        </li>
-                      ) : (
-                        <li key={b.id}>
-                          <button
-                            onClick={() => toggleBrand(b.id)}
-                            className="w-full flex items-center gap-3 min-h-[48px] px-3 -mx-1 rounded-md text-left text-sm text-slate-700 hover:bg-surface-alt transition-colors"
-                          >
-                            <span
-                              className={cn(
-                                "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
-                                activeBrands.includes(b.id)
-                                  ? "bg-slate-900 border-slate-900"
-                                  : "border-border-base bg-surface"
-                              )}
-                            >
-                              {activeBrands.includes(b.id) && <Check size={13} className="text-white" />}
-                            </span>
-                            <span className="flex-1">{b.name}</span>
-                            <span className="text-xs text-muted">{b.count}</span>
-                          </button>
-                        </li>
-                      )
-                    )}
-                  </ul>
-                  {filterCount > 0 && (
-                    <button
-                      onClick={clearFilters}
-                      className="mt-4 w-full min-h-[48px] rounded-md border border-border-base text-sm font-bold uppercase tracking-wide text-slate-900 hover:bg-surface-alt transition-colors"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </>
-              )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-auto pt-4 border-t border-[var(--line)] flex gap-3">
+              <button onClick={clearFilters} className="act act-line flex-1">
+                Clear
+              </button>
+              <button onClick={() => setSheet(null)} className="act act-fill flex-1">
+                Done ({filterCount})
+              </button>
+            </div>
+          </div>
         </div>
-      </Modal>
+      )}
+
+      {/* ── Mobile Sort Bottom Sheet ───────────────────────────────────── */}
+      {sheet === "sort" && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end lg:hidden">
+          <div className="bg-[var(--surface)] w-full rounded-t-xl p-6 animate-in slide-in-from-bottom">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--line)] mb-4">
+              <h3 className="font-bold text-base text-[var(--fg)]">Sort Products</h3>
+              <button onClick={() => setSheet(null)} className="ib" aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-1 mb-6">
+              {SORT_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => setSort(o.value)}
+                  className="w-full flex items-center justify-between py-3 px-2 text-sm text-[var(--fg)] text-left hover:bg-[var(--mortar)] rounded"
+                >
+                  <span className={cn(activeSort === o.value && "font-bold text-[var(--accent-ink)]")}>
+                    {o.label}
+                  </span>
+                  {activeSort === o.value && <Check size={18} className="text-[var(--accent-ink)]" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

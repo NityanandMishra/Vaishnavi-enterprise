@@ -147,6 +147,7 @@ model Category {
   defaultCheckoutMode String    @default("BUY") // "BUY" | "INQUIRE"
   hsnCode             String?   // Default HSN code for products in this category
   gstRate             Float?    @default(18.0) // Default GST % (e.g. 18.0)
+  sourcingLeadDays    Int?      @default(5) // B-01: Default days to arrange on-demand items
   sortOrder           Int       @default(0)
   parentId            String?   // null = top-level; populated = sub-category
   createdAt           DateTime  @default(now())
@@ -179,6 +180,7 @@ model Product {
   stockMode        String    // "TRACKED" | "VIRTUAL" | "INQUIRE"
   status           String    @default("DRAFT") // "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED"
   isAvailable      Boolean   @default(true)
+  sourcingLeadDays Int?      // B-01: Overrides Category sourcing lead days
   categoryId       String
   brandId          String?
   unit             String?   @default("Piece")
@@ -312,6 +314,7 @@ model Attribute {
   inputType         String    @default("SINGLE_SELECT") // "SINGLE_SELECT" | "MULTI_SELECT" | "TEXT" | "NUMBER" | "BOOLEAN"
   isVariantDefining Boolean   @default(false) // true only for SINGLE_SELECT attributes that generate SKUs
   description       String?
+  helpText          String?   // B-02: User-facing hint under variant group (e.g. "1200 mm suits most bedrooms")
   usesSwatches      Boolean   @default(false)
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())

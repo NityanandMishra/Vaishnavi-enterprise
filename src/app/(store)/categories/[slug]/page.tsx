@@ -25,11 +25,13 @@ export async function generateMetadata({
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
-  const category = await prisma.category.findUnique({ where: { slug: params.slug } });
+  const category = await prisma.category.findUnique({
+    where: { slug: params.slug },
+  });
   if (!category) return { title: "Category not found" };
   return {
-    title: category.name,
-    description: category.description ?? `Browse ${category.name} at Vaishnavi Enterprises.`,
+    title: `${category.name} — Vaishnavi Enterprises`,
+    description: category.description ?? `Browse ${category.name} at trade distributor prices.`,
   };
 }
 
@@ -38,36 +40,52 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams: CatalogSearchParams & { sub?: string };
+  searchParams: CatalogSearchParams & { sub?: string; avail?: string };
 }) {
   const category = await prisma.category.findUnique({
     where: { slug: params.slug },
     include: {
       parent: true,
-      // Unstocked subcategories still appear as chips, flagged and inert, so
-      // the admin can see what they created. They contribute no products to
-      // the scope below either way.
       children: {
+        where: { deletedAt: null },
         orderBy: { sortOrder: "asc" },
         include: { _count: { select: { products: true } } },
       },
     },
   });
 
-  if (!category) notFound();
+  if (!category || category.deletedAt) notFound();
 
-  // A parent category shows its own products plus everything in its sub-categories.
+  // Scope: parent category includes subcategories if not filtered
   const childIds = category.children.map((c) => c.id);
-  const scopeIds = searchParams.sub
-    ? [searchParams.sub]
-    : [category.id, ...childIds];
+  const scopeIds = searchParams.sub ? [searchParams.sub] : [category.id, ...childIds];
 
   const selectedBrands = brandFilter(searchParams.brand);
   const take = catalogTake(searchParams.show);
 
+  // Availability filter (§6.2)
+  let availCondition = {};
+  if (searchParams.avail === "stock") {
+    availCondition = {
+      checkoutMode: "BUY",
+      variants: { some: { stock: { gt: 0 } } },
+    };
+  } else if (searchParams.avail === "ask") {
+    availCondition = {
+      OR: [
+        { checkoutMode: "INQUIRE" },
+        { variants: { every: { stock: 0 } } },
+      ],
+    };
+  }
+
   const where = {
     categoryId: { in: scopeIds },
+    isAvailable: true,
+    status: "ACTIVE",
+    deletedAt: null,
     ...(selectedBrands.length > 0 && { brandId: { in: selectedBrands } }),
+    ...availCondition,
   };
 
   const [products, totalCount, brandGroups] = await Promise.all([
@@ -80,7 +98,7 @@ export default async function CategoryPage({
     prisma.product.count({ where }),
     prisma.product.groupBy({
       by: ["brandId"],
-      where: { categoryId: { in: scopeIds } },
+      where: { categoryId: { in: scopeIds }, isAvailable: true, status: "ACTIVE", deletedAt: null },
       _count: { _all: true },
     }),
   ]);
@@ -95,97 +113,87 @@ export default async function CategoryPage({
       name: b.name,
       count: brandGroups.find((g) => g.brandId === b.id)?._count._all ?? 0,
     }))
-    // The groupBy already implies at least one product, but keep the rule
-    // explicit so a brand can never render a "0" facet.
     .filter((b) => b.count > 0);
 
   const wishlisted = await wishlistedProductIds(products.map((p) => p.id));
-
   const hasMore = totalCount > products.length;
+
   const nextShowParams = new URLSearchParams(
     Object.entries(searchParams).filter(([, v]) => typeof v === "string") as [string, string][]
   );
   nextShowParams.set("show", String(take + PAGE_SIZE));
 
   return (
-    <>
-      <div className="max-w-content mx-auto px-4 lg:px-8 pt-4 lg:pt-6">
-        <Breadcrumbs
-          items={[
-            { label: "Home", href: "/" },
-            ...(category.parent
-              ? [{ label: category.parent.name, href: `/categories/${category.parent.slug}` }]
-              : []),
-            { label: category.name },
-          ]}
-        />
+    <div className="wrap py-6">
+      {/* ── Breadcrumb Navigation ────────────────────────────────────────── */}
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: "/" },
+          ...(category.parent
+            ? [{ label: category.parent.name, href: `/categories/${category.parent.slug}` }]
+            : []),
+          { label: category.name },
+        ]}
+      />
 
-        <div className="flex flex-wrap items-baseline justify-between gap-2 mt-4 mb-1">
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">{category.name}</h1>
-          <span className="text-sm text-slate-600">{totalCount} Products</span>
+      {/* ── Category Header ─────────────────────────────────────────────── */}
+      <div className="mt-4 mb-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--fg)] tracking-tight">
+            {category.name}
+          </h1>
+          <span className="text-sm font-semibold text-[var(--fg-muted)]">
+            {totalCount} {totalCount === 1 ? "Product" : "Products"}
+          </span>
         </div>
+
         {category.description && (
-          <p className="text-sm text-slate-600 max-w-2xl mb-4">{category.description}</p>
+          <p className="text-sm text-[var(--fg-muted)] max-w-2xl mt-1 leading-relaxed">
+            {category.description}
+          </p>
         )}
 
-        {/* Sub-category chips */}
+        {/* Sub-category chips row */}
         {category.children.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 lg:mx-0 lg:px-0">
+          <div className="chips mt-4">
             <Link
               href={`/categories/${category.slug}`}
-              className={cn(
-                "flex-shrink-0 min-h-[40px] flex items-center px-4 rounded-full border text-sm font-medium transition-colors",
-                !searchParams.sub
-                  ? "bg-slate-900 border-slate-900 text-white"
-                  : "bg-surface border-border-base text-slate-900 hover:border-slate-400"
-              )}
+              className={cn("tag", !searchParams.sub && "active")}
+              aria-pressed={!searchParams.sub}
             >
-              All Items
+              All {category.name}
             </Link>
-            {category.children.map((child) =>
-              child._count.products === 0 ? (
-                <span
-                  key={child.id}
-                  title="No products listed yet"
-                  className="flex-shrink-0 min-h-[40px] flex items-center gap-2 px-4 rounded-full border border-dashed border-border-base bg-surface-alt text-sm font-medium text-muted cursor-default"
-                >
-                  {child.name}
-                  <ComingSoonTag />
-                </span>
-              ) : (
-                <Link
-                  key={child.id}
-                  href={`/categories/${category.slug}?sub=${child.id}`}
-                  className={cn(
-                    "flex-shrink-0 min-h-[40px] flex items-center px-4 rounded-full border text-sm font-medium transition-colors",
-                    searchParams.sub === child.id
-                      ? "bg-slate-900 border-slate-900 text-white"
-                      : "bg-surface border-border-base text-slate-900 hover:border-slate-400"
-                  )}
-                >
-                  {child.name}
-                </Link>
-              )
-            )}
+            {category.children.map((child) => (
+              <Link
+                key={child.id}
+                href={`/categories/${category.slug}?sub=${child.id}`}
+                className={cn("tag", searchParams.sub === child.id && "active")}
+                aria-pressed={searchParams.sub === child.id}
+              >
+                {child.name}
+              </Link>
+            ))}
           </div>
         )}
       </div>
 
-      <div className="max-w-content mx-auto lg:px-8 lg:flex lg:gap-8 lg:pt-2">
+      {/* ── Main Layout: 264px Sidebar + Product Grid ───────────────────── */}
+      <div className="lg:flex lg:gap-8 lg:items-start pt-2">
         <CatalogControls brands={brands} />
 
-        <div className="flex-1 min-w-0 px-4 lg:px-0 pt-6">
+        <div className="flex-1 min-w-0 pt-4 lg:pt-0">
           {products.length === 0 ? (
             <EmptyState
               icon={PackageSearch}
-              title="No products found"
-              description="Nothing matches this selection yet. Try clearing filters or browsing another category."
-              actionLabel="Browse All Categories"
-              actionHref="/categories"
+              title="No matching products found"
+              description="No trade items matched this combination of filters. Try clearing some filters or browse another category."
+              actionLabel="View All Products"
+              actionHref={`/categories/${category.slug}`}
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {/* Fixed-slot Product Grid (§5.2) */}
+              <div className="cat">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -194,16 +202,17 @@ export default async function CategoryPage({
                 ))}
               </div>
 
+              {/* Pagination (§6.2: "Show N more" button) */}
               <div className="mt-8 text-center">
-                <p className="text-sm text-slate-600 mb-4">
-                  Showing {products.length} of {totalCount} products
+                <p className="text-xs text-[var(--fg-muted)] mb-3">
+                  Showing {products.length} of {totalCount} items
                 </p>
                 {hasMore && (
                   <Link
                     href={`/categories/${category.slug}?${nextShowParams.toString()}`}
-                    className="inline-flex items-center justify-center min-h-[48px] w-full sm:w-auto px-10 rounded-md border border-border-base bg-surface text-sm font-bold uppercase tracking-wide text-slate-900 hover:border-slate-400 transition-colors"
+                    className="act act-line min-h-[48px] px-8"
                   >
-                    Load More Products
+                    Show More Products ({totalCount - products.length} remaining)
                   </Link>
                 )}
               </div>
@@ -211,6 +220,6 @@ export default async function CategoryPage({
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

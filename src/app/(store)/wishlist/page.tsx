@@ -6,9 +6,12 @@ import { prisma } from "@/lib/db";
 import { authOptions } from "@/lib/nextauth";
 import { productCardInclude, toProductCardData } from "@/lib/catalog";
 import ProductCard from "@/components/store/ProductCard";
-import EmptyState from "@/components/store/EmptyState";
+import Breadcrumbs from "@/components/store/Breadcrumbs";
 
-export const metadata: Metadata = { title: "Your Wishlist" };
+export const metadata: Metadata = {
+  title: "Your Saved Hardware | Vaishnavi Enterprises",
+  description: "Saved trade products and electrical hardware for future reference.",
+};
 
 export default async function WishlistPage() {
   const session = await getServerSession(authOptions);
@@ -16,37 +19,59 @@ export default async function WishlistPage() {
   if (!userId) redirect("/auth/login?callbackUrl=/wishlist");
 
   const items = await prisma.wishlistItem.findMany({
-    where: { userId },
+    where: {
+      userId,
+      product: { deletedAt: null, isAvailable: true },
+    },
     orderBy: { createdAt: "desc" },
     include: { product: { include: productCardInclude } },
   });
 
   return (
-    <div className="max-w-content mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-4">
-      <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Your Wishlist</h1>
-      <p className="text-sm text-slate-600 mt-1 mb-6">
-        {items.length} {items.length === 1 ? "item" : "items"} saved for later
-      </p>
+    <div className="min-h-screen bg-[var(--bg)] pb-16">
+      <div className="wrap pt-6">
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Saved Items" }]} />
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={Heart}
-          title="Your wishlist is empty"
-          description="Save products you're considering and come back to them any time."
-          actionLabel="Browse Products"
-          actionHref="/categories"
-        />
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-          {items.map((item) => (
-            <ProductCard
-              key={item.id}
-              product={toProductCardData(item.product, { wishlisted: true })}
-              action="move-to-cart"
-            />
-          ))}
+        <div className="flex flex-wrap items-baseline justify-between gap-3 mt-4 mb-6 border-b border-[var(--line)] pb-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--fg)] tracking-tight">
+              Saved Products & Equipment
+            </h1>
+            <p className="text-xs sm:text-sm text-[var(--fg-muted)] mt-1">
+              Keep track of required hardware for ongoing commercial installations.
+            </p>
+          </div>
+          <span className="text-xs sm:text-sm font-semibold text-[var(--fg-muted)] fig">
+            {items.length} {items.length === 1 ? "product" : "products"} saved
+          </span>
         </div>
-      )}
+
+        {items.length === 0 ? (
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-12 text-center max-w-lg mx-auto my-8 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-[var(--mortar)] flex items-center justify-center mx-auto text-[var(--fg-quiet)]">
+              <Heart size={24} />
+            </div>
+            <h2 className="text-lg font-bold text-[var(--fg)]">Your saved list is empty</h2>
+            <p className="text-sm text-[var(--fg-muted)]">
+              Tap the bookmark icon on any electrical product card to save it here for later reference.
+            </p>
+            <div className="pt-2">
+              <a href="/" className="act act-fill">
+                Browse Trade Catalogue
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="cat">
+            {items.map((item) => (
+              <ProductCard
+                key={item.id}
+                product={toProductCardData(item.product, { wishlisted: true })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

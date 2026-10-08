@@ -11,6 +11,7 @@ import { authOptions } from "@/lib/nextauth";
 import { CART_COOKIE, cartInclude, cartTotals, lineItemPrice } from "@/lib/cart";
 import { calculateTax, roundPaisa } from "@/lib/tax/tax-engine";
 import { getStateCodeByName } from "@/lib/tax/indian-states";
+import { resolveShippingRate } from "@/lib/orders/shipping-resolver";
 
 async function currentUserId(): Promise<string | undefined> {
   const session = await getServerSession(authOptions);
@@ -281,12 +282,36 @@ export async function submitSolarInquiry(_prev: unknown, formData: FormData) {
   return { ok: true as const, reference: lead.id.slice(0, 8).toUpperCase() };
 }
 
-/** Placeholder serviceability check — every Indian pincode is treated as deliverable. */
-export async function checkPincode(pincode: string) {
-  if (!/^\d{6}$/.test(pincode)) {
-    return { ok: false as const, error: "Enter a valid 6-digit pincode." };
+/** Courier serviceability check backed by shipping-resolver (Module 07) */
+export async function checkPincode(pincode: string, state?: string) {
+  const result = resolveShippingRate(pincode, state);
+  if (!result.serviceable) {
+    return { ok: false as const, error: result.error || `Pincode ${pincode} is not serviceable for direct delivery.` };
   }
-  return { ok: true as const, deliverable: true, etaDays: "2–5 business days" };
+
+  let etaDays = 3;
+  if (result.zone === "Mumbai Metro") etaDays = 1;
+  else if (result.zone === "Rest of Maharashtra") etaDays = 2;
+  else etaDays = 4;
+
+  const today = new Date();
+  const etaDate = new Date(today.getTime() + etaDays * 24 * 60 * 60 * 1000);
+  const dateStr = etaDate.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  return {
+    ok: true as const,
+    deliverable: true,
+    zone: result.zone,
+    couriers: result.couriers,
+    etaDays,
+    etaDate: dateStr,
+    codAvailable: true,
+    rate: result.rate,
+  };
 }
 
 // ─── COUPON VALIDATION ────────────────────────────────────────────────────────
@@ -344,15 +369,17 @@ export async function validateCoupon(code: string, subtotal: number) {
 }
 
 const placeOrderSchema = z.object({
-  fullName: z.string().trim().min(2).max(80),
-  phone: z.string().trim().regex(/^(\+91[\s-]?)?[6-9]\d{9}$/, "Enter a valid mobile number."),
-  addressLine1: z.string().trim().min(4).max(160),
+  fullName: z.string().trim().min(2, "Enter your full name.").max(80),
+  phone: z.string().trim().regex(/^(\+91[\s-]?)?[6-9]\d{9}$/, "Enter a valid 10-digit mobile number."),
+  addressLine1: z.string().trim().min(4, "Enter your street / building address.").max(160),
   addressLine2: z.string().trim().max(160).optional().or(z.literal("")),
-  city: z.string().trim().min(2).max(80),
-  state: z.string().trim().min(2).max(80),
+  city: z.string().trim().min(2, "Enter your city or town.").max(80),
+  state: z.string().trim().min(2, "Enter your state.").max(80),
   pincode: z.string().trim().regex(/^\d{6}$/, "Enter a valid 6-digit pincode."),
   paymentMethod: z.enum(["RAZORPAY", "COD"]),
   couponCode: z.string().trim().optional().or(z.literal("")),
+  gstin: z.string().trim().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, "Enter a valid 15-character GSTIN.").optional().or(z.literal("")),
+  firmName: z.string().trim().max(120).optional().or(z.literal("")),
 });
 
 export async function placeOrder(_prev: unknown, formData: FormData) {
@@ -369,6 +396,8 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     pincode: formData.get("pincode"),
     paymentMethod: formData.get("paymentMethod"),
     couponCode: formData.get("couponCode") ?? "",
+    gstin: formData.get("gstin") ?? "",
+    firmName: formData.get("firmName") ?? "",
   });
 
   if (!parsed.success) {

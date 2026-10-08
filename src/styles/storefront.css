@@ -1,0 +1,1118 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@85..125,400..800&family=Mukta:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=Hind:wght@400;500;600;700&display=swap');
+
+/* ================================================================
+   VAISHNAVI ENTERPRISES — STOREFRONT RESPONSIVE DESIGN SYSTEM
+   Palette grounded in the trade: copper, petrol ink, concrete,
+   verdigris (oxidised copper), brass.
+   Specification: Module 10 Responsive Design System & Page Build
+   ================================================================ */
+
+:root {
+  /* --- primitives --- */
+  --ink-900: #13232E;
+  --ink-800: #1C3140;
+  --ink-700: #294356;
+  --steel-600: #4C6274;
+  --steel-500: #6B8094;
+  --steel-400: #93A4B3;
+  --rule: #D9DEE3;
+  --rule-soft: #E7EBEF;
+  --paper: #FFFFFF;
+  --mortar: #ECEEF0;
+  --mortar-deep: #E2E6EA;
+
+  --copper-700: #8E3F1F;
+  --copper-600: #B4532A;
+  --copper-500: #C96A3C;
+  --copper-lit: #E8893F;
+  --copper-wash: #FBEFE8;
+
+  --verdigris-700: #1F6B52;
+  --verdigris-wash: #E4F1EB;
+  --brass-700: #8A6118;
+  --brass-wash: #F6EFDF;
+  --brass-line: #E6D6B4;
+  --signal-700: #A32E1E;
+
+  /* Spec §3.1 layer aliases */
+  --navy-900: var(--ink-900);
+  --navy-800: var(--ink-800);
+  --navy-700: var(--ink-700);
+  --slate-600: var(--steel-600);
+  --slate-500: var(--steel-500);
+  --slate-400: var(--steel-400);
+  --slate-300: #CBD5E1;
+  --line-200: var(--rule);
+  --line-300: #CBD5E1;
+  --canvas: var(--mortar);
+  --sunken: var(--mortar-deep);
+
+  --orange-50: var(--copper-wash);
+  --orange-600: var(--copper-600);
+  --orange-700: var(--copper-700);
+  --orange-800: #7C2D0B;
+  --green-50: var(--verdigris-wash);
+  --green-700: var(--verdigris-700);
+  --green-800: #17553F;
+  --amber-25: #FFFDF8;
+  --amber-50: var(--brass-wash);
+  --amber-200: var(--brass-line);
+  --amber-700: var(--brass-700);
+  --wa-600: #1F6B52;
+  --wa-700: #17553F;
+  --red-700: var(--signal-700);
+
+  /* --- semantic --- */
+  --fg: var(--ink-900);
+  --fg-muted: var(--steel-600);
+  --fg-quiet: var(--steel-500);
+  --fg-subtle: var(--steel-400);
+  --bg: var(--mortar);
+  --surface: var(--paper);
+  --surface-sunken: var(--mortar-deep);
+  --line: var(--rule);
+  --line-soft: var(--rule-soft);
+  --border: var(--rule);
+  --border-strong: var(--steel-400);
+
+  --accent: var(--copper-600);
+  --accent-ink: var(--copper-700);
+  --accent-wash: var(--copper-wash);
+  --brand: var(--copper-600);
+  --brand-ink: var(--copper-700);
+  --brand-tint: var(--copper-wash);
+  --ok: var(--verdigris-700);
+  --ok-wash: var(--verdigris-wash);
+  --ok-tint: var(--verdigris-wash);
+  --ask: var(--brass-700);
+  --ask-wash: var(--brass-wash);
+  --ask-line: var(--brass-line);
+  --ask-tint: var(--brass-wash);
+  --ask-bg: var(--amber-25);
+  --ring: var(--copper-600);
+
+  /* --- typography --- */
+  --display: 'Archivo', 'Manrope', system-ui, sans-serif;
+  --body: 'Mukta', 'Hind', system-ui, sans-serif;
+  --font-display: var(--display);
+  --font-body: var(--body);
+
+  /* Spec §3.2 font scale */
+  --fs-xs: 12px;
+  --fs-sm: 13.5px;
+  --fs-md: 15px;
+  --fs-base: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 21px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+  --fs-4xl: 40px;
+
+  /* Spec §3.3 radius & elevation */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-full: 999px;
+  --sh-sm: 0 1px 2px rgba(19, 35, 46, 0.06);
+  --sh-md: 0 4px 12px rgba(19, 35, 46, 0.08);
+  --sh-lg: 0 12px 28px rgba(19, 35, 46, 0.10);
+
+  /* --- layout & component tokens --- */
+  --tap: 44px;
+  --hdr: 64px;
+  --hdr-h: 64px;
+  --max: 1280px;
+  --container: 1240px;
+
+  /* Card slot metrics (Mobile/Tablet baseline) */
+  --cell-h: 420px;
+  --cell-img: 168px;
+  --card-h: 420px;
+  --card-img: 168px;
+  --sl-maker: 17px;
+  --sl-name: 40px;
+  --sl-note: 34px;
+  --sl-price: 28px;
+  --sl-sub: 18px;
+  --sl-stock: 18px;
+  --slot-brand: 17px;
+  --slot-title: 40px;
+  --slot-desc: 34px;
+  --slot-price: 28px;
+  --slot-save: 18px;
+  --slot-avail: 18px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --cell-h: 452px;
+    --cell-img: 196px;
+    --card-h: 452px;
+    --card-img: 196px;
+    --sl-name: 42px;
+    --slot-title: 42px;
+  }
+}
+
+/* ----------------------------------------------------------------
+   RESPECT ACCESSIBILITY & TEXT ADJUST
+   ---------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body.storefront-body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+p {
+  margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--display);
+  line-height: 1.15;
+  font-variation-settings: 'wdth' 112;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+}
+
+a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fig, .num {
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: 'wdth' 100;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------
+   RESPONSIVE CONTAINERS & BANDS
+   ---------------------------------------------------------------- */
+.wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 18px;
+}
+@media (min-width: 768px) {
+  .wrap {
+    padding: 0 28px;
+  }
+}
+@media (min-width: 1280px) {
+  .wrap {
+    padding: 0 40px;
+  }
+}
+
+.band {
+  padding: 44px 0;
+}
+@media (min-width: 768px) {
+  .band {
+    padding: 64px 0;
+  }
+}
+.band-paper {
+  background: var(--surface);
+}
+.band-ink {
+  background: var(--ink-900);
+  color: #FFFFFF;
+}
+.band-brass {
+  background: var(--ask-wash);
+}
+
+.lede {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 22px;
+  border-bottom: 2px solid var(--ink-900);
+  padding-bottom: 12px;
+}
+.lede h2 {
+  font-size: 25px;
+  font-weight: 700;
+  flex-grow: 1;
+}
+@media (min-width: 768px) {
+  .lede h2 {
+    font-size: 31px;
+  }
+}
+.lede a {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding-bottom: 3px;
+  color: var(--accent-ink);
+}
+
+/* ----------------------------------------------------------------
+   §4.2 CRITICAL OVERFLOW GUARDS
+   Rule: min-width: 0 on every grid and flex child
+   ---------------------------------------------------------------- */
+.grow {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.cat > *, .depts > *, .base-grid > *, .assure-in > *, .pair > *,
+.plp > *, .cartg > *, .pdp > *, .pdp2 > *, .howgrid > *, .svcgrid > *,
+.pgrid > *, .cgrid > *, .ftr-grid > *, .trust-in > * {
+  min-width: 0;
+}
+
+/* Breakpoint visibility rules (avoid inline style overrides) */
+.d-only, .row-wide, .only-wide {
+  display: none !important;
+}
+@media (min-width: 1024px) {
+  .d-only {
+    display: flex !important;
+  }
+  .row-wide {
+    display: flex !important;
+  }
+  .only-wide {
+    display: block !important;
+  }
+}
+
+.m-only, .row-narrow, .only-narrow {
+  display: flex !important;
+}
+@media (min-width: 1024px) {
+  .m-only {
+    display: none !important;
+  }
+  .row-narrow {
+    display: none !important;
+  }
+  .only-narrow {
+    display: none !important;
+  }
+}
+
+/* ----------------------------------------------------------------
+   CONTROLS & BUTTONS (§5.1)
+   ---------------------------------------------------------------- */
+.act, .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: var(--tap);
+  padding: 0 22px;
+  border-radius: var(--r-md);
+  border: 1.5px solid transparent;
+  font-family: var(--body);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  user-select: none;
+  text-decoration: none;
+}
+
+.act-fill, .btn-primary {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+.act-fill:hover, .btn-primary:hover {
+  background: var(--copper-700);
+  color: #FFFFFF;
+}
+
+.act-line, .btn-outline {
+  background: transparent;
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.act-line:hover, .btn-outline:hover {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.act-ink, .btn-dark {
+  background: var(--ink-900);
+  color: #FFFFFF;
+}
+.act-ink:hover, .btn-dark:hover {
+  background: var(--ink-700);
+  color: #FFFFFF;
+}
+
+.act-brass, .btn-ask {
+  background: var(--surface);
+  color: var(--ask);
+  border-color: var(--ask);
+}
+.act-brass:hover, .btn-ask:hover {
+  background: #F0E5CC;
+  color: var(--ask);
+}
+
+.act-chat, .btn-wa {
+  background: var(--verdigris-700);
+  color: #FFFFFF;
+}
+.act-chat:hover, .btn-wa:hover {
+  background: #17553F;
+  color: #FFFFFF;
+}
+
+.act-big, .btn-lg {
+  min-height: 54px;
+  font-size: 17px;
+  padding: 0 28px;
+}
+
+.act-wide, .btn-block {
+  display: flex;
+  width: 100%;
+}
+
+.ib {
+  width: var(--tap);
+  height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  color: inherit;
+  transition: background-color 0.16s ease;
+}
+.ib:hover {
+  background: var(--mortar);
+}
+
+/* ----------------------------------------------------------------
+   CHIPS & TAGS (§5.4)
+   ---------------------------------------------------------------- */
+.tag, .chip {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+.tag:hover, .chip:hover {
+  border-color: var(--steel-400);
+}
+.tag[aria-pressed="true"], .chip[aria-pressed="true"], .chip.active {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* ----------------------------------------------------------------
+   BADGES & FLAGS
+   ---------------------------------------------------------------- */
+.flag, .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: var(--r-sm);
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.flag-ok, .badge-ok {
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+
+.flag-ask, .badge-ask {
+  background: var(--ask);
+  color: #FFFFFF;
+}
+
+.flag-thin, .badge-low {
+  background: var(--ask-wash);
+  color: var(--ask);
+  border: 1px solid var(--ask-line);
+}
+
+/* ----------------------------------------------------------------
+   PRODUCT CARD — THE SLOT SYSTEM (§5.2)
+   Every row has a reserved height. Cards NEVER size to content.
+   ---------------------------------------------------------------- */
+.cat, .pgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--line-soft);
+  gap: 1px;
+  border: 1px solid var(--line-soft);
+}
+@media (min-width: 640px) {
+  .cat, .pgrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .cat, .pgrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.cell, .pcard {
+  height: var(--cell-h);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: inherit;
+  padding: 0;
+  position: relative;
+  transition: background-color 0.16s ease;
+  overflow: hidden;
+}
+.cell:hover, .pcard:hover {
+  background: #FAFBFC;
+  color: inherit;
+}
+
+/* Slot 1: Media */
+.cell-fig, .pcard-media {
+  height: var(--cell-img);
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mortar);
+  overflow: hidden;
+}
+
+/* Card Body container */
+.cell-body {
+  flex-grow: 1;
+  padding: 13px 14px 15px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Slot 2: Brand / Maker */
+.cell-maker, .pcard-brand {
+  height: var(--sl-maker);
+  line-height: var(--sl-maker);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+}
+
+/* Slot 3: Title */
+.cell-name, .pcard-title {
+  height: var(--sl-name);
+  margin-top: 3px;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.28;
+  font-variation-settings: 'wdth' 104;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Slot 4: Decisive Plain-Language Fact */
+.cell-note, .pcard-desc {
+  height: var(--sl-note);
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--fg-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Slot 5: Price */
+.cell-price, .pcard-price {
+  height: var(--sl-price);
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+.cell-price .now {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.cell-price .was {
+  font-size: 13px;
+  color: var(--fg-quiet);
+  text-decoration: line-through;
+}
+.cell-price .ask {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ask);
+  font-variation-settings: 'wdth' 104;
+}
+
+/* Slot 6: Savings / Confirmation line */
+.cell-sub, .pcard-save {
+  height: var(--sl-sub);
+  line-height: var(--sl-sub);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ok);
+}
+.cell-sub.on-ask, .pcard-save.on-ask {
+  color: var(--ask);
+}
+
+/* Slot 7: Honest Availability */
+.cell-stock, .pcard-avail {
+  height: var(--sl-stock);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Slot 8: Bottom-Pinned Action Button */
+.cell-act, .pcard-cta {
+  margin-top: auto;
+  flex-shrink: 0;
+  min-height: var(--tap);
+}
+
+/* INQUIRE Card Specialization */
+.cell.on-ask, .pcard.is-ask {
+  background: #FFFDF8;
+}
+.cell.on-ask .cell-fig, .pcard.is-ask .pcard-media {
+  background: var(--ask-wash);
+}
+.cell.on-ask:hover, .pcard.is-ask:hover {
+  background: #FAF5E9;
+}
+
+/* ----------------------------------------------------------------
+   CATEGORY / DEPARTMENT TILES (§6.1)
+   ---------------------------------------------------------------- */
+.depts, .cgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border: 1px solid var(--line-soft);
+}
+@media (min-width: 640px) {
+  .depts, .cgrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .depts, .cgrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.dept {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 18px 18px;
+  background: var(--surface);
+  color: inherit;
+  transition: background-color 0.16s ease;
+}
+.dept:hover {
+  background: var(--accent-wash);
+  color: inherit;
+}
+.dept-fig {
+  height: 52px;
+  display: flex;
+  align-items: flex-end;
+  color: var(--accent-ink);
+}
+.dept span {
+  font-family: var(--display);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  min-height: 38px;
+  font-variation-settings: 'wdth' 104;
+  color: var(--fg);
+}
+
+/* ----------------------------------------------------------------
+   HEADER (§5.5)
+   ---------------------------------------------------------------- */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.top-in {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--hdr);
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-900);
+}
+.mark b {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variation-settings: 'wdth' 108;
+  line-height: 1;
+}
+.mark small {
+  display: block;
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-quiet);
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+}
+
+.topnav {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .topnav {
+    display: flex;
+    gap: 24px;
+    margin-left: 24px;
+  }
+  .topnav a {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
+    padding: 6px 0;
+    border-bottom: 2px solid transparent;
+    transition: color 0.16s ease, border-color 0.16s ease;
+  }
+  .topnav a:hover, .topnav a[aria-current="page"] {
+    color: var(--accent-ink);
+    border-bottom-color: var(--accent);
+  }
+}
+
+.find {
+  display: none;
+}
+@media (min-width: 768px) {
+  .find {
+    display: flex;
+    flex-grow: 1;
+    min-width: 210px;
+    max-width: 360px;
+    margin: 0 16px;
+    position: relative;
+  }
+  .find input {
+    width: 100%;
+    height: 44px;
+    padding: 0 16px 0 42px;
+    border-radius: var(--r-md);
+    border: 1.5px solid var(--line);
+    background: var(--mortar);
+    font-family: var(--body);
+    font-size: 15px;
+    color: var(--fg);
+    transition: border-color 0.16s ease, background-color 0.16s ease;
+  }
+  .find input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(180, 83, 42, 0.14);
+  }
+  .find svg {
+    position: absolute;
+    left: 13px;
+    top: 13px;
+    color: var(--fg-quiet);
+    pointer-events: none;
+  }
+}
+
+.top-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* ----------------------------------------------------------------
+   MOBILE BOTTOM NAVIGATION (§5.5)
+   ---------------------------------------------------------------- */
+.foot-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.foot-nav a, .foot-nav button {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-quiet);
+  background: transparent;
+  border: none;
+  text-decoration: none;
+}
+.foot-nav a span, .foot-nav button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foot-nav a[aria-current="page"], .foot-nav button[aria-current="page"] {
+  color: var(--accent-ink);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+@media (min-width: 1024px) {
+  .foot-nav {
+    display: none;
+  }
+}
+
+.gap-nav, .pb-nav {
+  padding-bottom: 76px;
+}
+@media (min-width: 1024px) {
+  .gap-nav, .pb-nav {
+    padding-bottom: 0;
+  }
+}
+
+/* ----------------------------------------------------------------
+   ASSURANCE / TRUST STRIP (§6.1)
+   ---------------------------------------------------------------- */
+.assure {
+  background: var(--ink-900);
+  color: #FFFFFF;
+}
+.assure-in {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 18px 0;
+}
+.assure-in > * {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.assure div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #DCE4EA;
+}
+.assure div span {
+  min-width: 0;
+}
+.assure svg {
+  color: var(--copper-lit);
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------------
+   FORMS & INPUTS (§5.4)
+   ---------------------------------------------------------------- */
+.fld, .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.fld label, .form-group label {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.inp, .input {
+  height: 48px;
+  padding: 0 15px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-family: var(--body);
+  font-size: 16px;
+  color: var(--fg);
+  width: 100%;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.inp:focus, .input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(180, 83, 42, 0.14);
+}
+.inp.fig, .input.num-in {
+  font-weight: 600;
+}
+.note, .form-help {
+  font-size: 13.5px;
+  color: var(--fg-muted);
+}
+.field-error {
+  font-size: 13px;
+  color: var(--red-700);
+  font-weight: 500;
+}
+
+/* ----------------------------------------------------------------
+   PAGE FOOTER (§5.5)
+   ---------------------------------------------------------------- */
+.base {
+  background: var(--ink-900);
+  color: #FFFFFF;
+  padding: 48px 0 32px;
+}
+.base-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+@media (min-width: 768px) {
+  .base-grid {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
+}
+.base h4 {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 12px;
+  font-variation-settings: 'wdth' 104;
+}
+.base a {
+  display: block;
+  color: #A9BCC9;
+  font-size: 14.5px;
+  padding: 5px 0;
+  transition: color 0.16s ease;
+}
+.base a:hover {
+  color: #FFFFFF;
+}
+
+/* ----------------------------------------------------------------
+   VARIANT SELECTOR (§5.3)
+   ---------------------------------------------------------------- */
+.var-group {
+  margin-bottom: 20px;
+}
+.var-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14.5px;
+}
+.var-label b {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+}
+.var-label span {
+  font-size: 13.5px;
+  color: var(--fg-muted);
+}
+.var-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.var-chip {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.16s ease;
+  user-select: none;
+}
+.var-chip:hover {
+  border-color: var(--steel-400);
+}
+.var-chip.is-selected {
+  border: 2px solid var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.var-chip.is-unavailable {
+  opacity: 0.55;
+  text-decoration: line-through;
+  background: var(--mortar);
+  border-color: var(--line-soft);
+}
+.var-helper {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.swatch-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------------
+   STICKY ACTIONS & BUY BAR
+   ---------------------------------------------------------------- */
+.sticky-buy-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+@media (min-width: 1024px) {
+  .sticky-buy-bar {
+    display: none !important;
+  }
+}
+
+/* ----------------------------------------------------------------
+   REDUCED MOTION
+   ---------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

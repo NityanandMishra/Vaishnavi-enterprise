@@ -7,16 +7,17 @@ import {
   AlertCircle,
   ImageOff,
   Smartphone,
-  CreditCard,
-  Landmark,
   Banknote,
-  Tag,
   CheckCircle2,
+  FileText,
+  Truck,
+  ShieldCheck,
+  Tag,
   X,
   Loader2,
 } from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
-import { placeOrder, validateCoupon } from "@/app/(store)/actions";
+import { placeOrder, validateCoupon, checkPincode } from "@/app/(store)/actions";
 
 type SummaryLine = {
   id: string;
@@ -27,16 +28,30 @@ type SummaryLine = {
   imageUrl: string | null;
 };
 
-const PAYMENT_METHODS = [
-  { value: "RAZORPAY", label: "UPI (GPay, PhonePe)", icon: Smartphone },
-  { value: "RAZORPAY_CARD", label: "Debit / Credit Card", icon: CreditCard },
-  { value: "RAZORPAY_NB", label: "Netbanking", icon: Landmark },
-  { value: "COD", label: "Cash on Delivery (COD)", icon: Banknote },
-] as const;
-
-const SHIPPING_METHODS = [
-  { value: "standard", label: "Standard Ground", detail: "Delivery in 3–5 business days", price: "Free" },
-  { value: "express", label: "Express Heavy", detail: "Priority 2-day delivery", price: "₹2,450" },
+const INDIAN_STATES = [
+  "Uttar Pradesh",
+  "Maharashtra",
+  "Delhi",
+  "Bihar",
+  "Madhya Pradesh",
+  "Rajasthan",
+  "Haryana",
+  "Punjab",
+  "Gujarat",
+  "West Bengal",
+  "Karnataka",
+  "Tamil Nadu",
+  "Telangana",
+  "Andhra Pradesh",
+  "Odisha",
+  "Chhattisgarh",
+  "Jharkhand",
+  "Uttarakhand",
+  "Himachal Pradesh",
+  "Assam",
+  "Kerala",
+  "Goa",
+  "Jammu & Kashmir",
 ] as const;
 
 export default function CheckoutForm({
@@ -52,10 +67,27 @@ export default function CheckoutForm({
   total: number;
   defaultName: string;
 }) {
-  const [payment, setPayment] = useState<string>("RAZORPAY");
-  const [shipping, setShipping] = useState<string>("standard");
+  const [payment, setPayment] = useState<"RAZORPAY" | "COD">("RAZORPAY");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // GST Invoice State (§6.6)
+  const [needsGstInvoice, setNeedsGstInvoice] = useState(false);
+  const [gstin, setGstin] = useState("");
+  const [firmName, setFirmName] = useState("");
+
+  // Pincode & Delivery Serviceability (§6.6)
+  const [pincode, setPincode] = useState("");
+  const [pincodeStatus, setPincodeStatus] = useState<{
+    loading: boolean;
+    result: {
+      ok: boolean;
+      etaDate?: string;
+      couriers?: string[];
+      zone?: string;
+      error?: string;
+    } | null;
+  }>({ loading: false, result: null });
 
   // Coupon State
   const [couponCode, setCouponCode] = useState("");
@@ -66,6 +98,42 @@ export default function CheckoutForm({
     discount: number;
     message: string;
   } | null>(null);
+
+  async function handlePincodeBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const code = e.target.value.trim();
+    if (!/^\d{6}$/.test(code)) {
+      if (code) {
+        setPincodeStatus({
+          loading: false,
+          result: { ok: false, error: "Enter a valid 6-digit Indian PIN code." },
+        });
+      } else {
+        setPincodeStatus({ loading: false, result: null });
+      }
+      return;
+    }
+
+    setPincodeStatus({ loading: true, result: null });
+    try {
+      const res = await checkPincode(code);
+      setPincodeStatus({
+        loading: false,
+        result: res.ok
+          ? {
+              ok: true,
+              etaDate: res.etaDate,
+              couriers: res.couriers,
+              zone: res.zone,
+            }
+          : { ok: false, error: res.error },
+      });
+    } catch {
+      setPincodeStatus({
+        loading: false,
+        result: { ok: false, error: "Could not verify PIN code serviceability." },
+      });
+    }
+  }
 
   async function handleApplyCoupon(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +153,7 @@ export default function CheckoutForm({
       } else {
         setCouponError(res.error);
       }
-    } catch (_) {
+    } catch {
       setCouponError("Failed to validate coupon code.");
     } finally {
       setCouponLoading(false);
@@ -107,65 +175,87 @@ export default function CheckoutForm({
     e.preventDefault();
     setError(null);
     const formData = new FormData(e.currentTarget);
-    // Card and netbanking both settle through Razorpay.
-    formData.set("paymentMethod", payment === "COD" ? "COD" : "RAZORPAY");
+    formData.set("paymentMethod", payment);
+
     if (appliedCoupon) {
       formData.set("couponCode", appliedCoupon.code);
     }
 
+    if (needsGstInvoice) {
+      if (!gstin.trim() || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin.trim().toUpperCase())) {
+        setError("Please enter a valid 15-character GSTIN (e.g. 09ABCDE1234F1Z5).");
+        return;
+      }
+      formData.set("gstin", gstin.trim().toUpperCase());
+      formData.set("firmName", firmName.trim());
+    }
+
     startTransition(async () => {
       const response = await placeOrder(null, formData);
-      if (response && !response.ok) setError(response.error);
+      if (response && !response.ok) {
+        setError(response.error);
+      }
     });
   }
 
   const summary = (
-    <div className="bg-surface border border-border-base rounded-lg p-5">
-      <h2 className="text-base font-semibold text-slate-900 mb-4">Items ({lines.length})</h2>
-      <ul className="space-y-3 mb-5">
+    <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-5 space-y-5">
+      <div className="border-b border-[var(--line-soft)] pb-3">
+        <h2 className="text-base font-bold text-[var(--fg)] tracking-tight">
+          Dispatch Summary ({lines.length} items)
+        </h2>
+      </div>
+
+      <ul className="divide-y divide-[var(--line-soft)] max-h-80 overflow-y-auto pr-1">
         {lines.map((line) => (
-          <li key={line.id} className="flex gap-3">
-            <div className="relative w-14 h-14 flex-shrink-0 bg-surface-alt rounded-md overflow-hidden">
+          <li key={line.id} className="py-3 flex gap-3 first:pt-0 last:pb-0">
+            <div className="relative w-14 h-14 flex-shrink-0 bg-[var(--mortar)] rounded border border-[var(--line-soft)] overflow-hidden">
               {line.imageUrl ? (
-                <Image src={line.imageUrl} alt="" fill className="object-contain p-1" sizes="56px" />
+                <Image
+                  src={line.imageUrl}
+                  alt={line.title}
+                  fill
+                  className="object-contain p-1"
+                  sizes="56px"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <ImageOff size={16} className="text-slate-300" />
+                  <ImageOff size={16} className="text-[var(--fg-quiet)]" />
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 leading-snug line-clamp-2">
+              <p className="text-sm font-semibold text-[var(--fg)] leading-snug line-clamp-2">
                 {line.title}
               </p>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Qty: {line.quantity}
+              <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+                Qty: <span className="font-bold fig">{line.quantity}</span>
                 {line.variantTitle && ` · ${line.variantTitle}`}
               </p>
             </div>
-            <p className="text-sm font-bold text-slate-900 whitespace-nowrap">
-              {formatINR(line.price * line.quantity)}
+            <p className="text-sm font-bold text-[var(--fg)] whitespace-nowrap fig">
+              ₹{formatINR(line.price * line.quantity)}
             </p>
           </li>
         ))}
       </ul>
 
       {/* Coupon Code Section */}
-      <div className="pt-4 border-t border-border-base mb-4">
+      <div className="pt-3 border-t border-[var(--line-soft)]">
         {appliedCoupon ? (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-md flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-emerald-800 font-medium">
-              <Tag size={15} className="text-emerald-600" />
+          <div className="p-3 bg-[var(--ok-wash)] border border-[var(--ok)]/30 rounded flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-[var(--ok)] font-medium">
+              <Tag size={15} />
               <div>
-                <span className="font-bold font-mono uppercase">{appliedCoupon.code}</span>
-                <span className="text-[11px] block text-emerald-700">{appliedCoupon.message}</span>
+                <span className="font-bold uppercase font-mono">{appliedCoupon.code}</span>
+                <span className="text-[11px] block">{appliedCoupon.message}</span>
               </div>
             </div>
             <button
               type="button"
               onClick={handleRemoveCoupon}
               aria-label="Remove coupon"
-              className="w-6 h-6 rounded-full flex items-center justify-center text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition-colors"
+              className="w-6 h-6 rounded flex items-center justify-center text-[var(--ok)] hover:bg-[var(--ok-wash)] transition-colors"
             >
               <X size={14} />
             </button>
@@ -174,7 +264,7 @@ export default function CheckoutForm({
           <form onSubmit={handleApplyCoupon} className="space-y-2">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Tag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Tag size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-quiet)]" />
                 <input
                   type="text"
                   value={couponCode}
@@ -182,21 +272,21 @@ export default function CheckoutForm({
                     setCouponCode(e.target.value.toUpperCase());
                     setCouponError(null);
                   }}
-                  placeholder="Coupon code (e.g. WELCOME10)"
-                  className="w-full h-10 pl-9 pr-3 uppercase font-mono text-xs border border-border-base rounded-md focus:outline-none focus:ring-1 focus:ring-brand-orange-600"
+                  placeholder="Coupon code"
+                  className="w-full h-10 pl-9 pr-3 uppercase font-mono text-xs border border-[var(--line)] rounded bg-[var(--surface)] focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={couponLoading || !couponCode.trim()}
-                className="h-10 px-4 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="act act-ink h-10 px-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50"
               >
-                {couponLoading && <Loader2 size={13} className="animate-spin" />}
-                <span>Apply</span>
+                {couponLoading && <Loader2 size={13} className="animate-spin mr-1" />}
+                Apply
               </button>
             </div>
             {couponError && (
-              <p className="text-xs text-danger font-medium flex items-center gap-1">
+              <p className="text-xs text-[var(--signal-700)] font-medium flex items-center gap-1">
                 <AlertCircle size={13} /> {couponError}
               </p>
             )}
@@ -204,26 +294,50 @@ export default function CheckoutForm({
         )}
       </div>
 
-      <dl className="space-y-2 text-sm pt-4 border-t border-border-base">
+      <dl className="space-y-2.5 text-sm pt-4 border-t border-[var(--line-soft)]">
         <div className="flex justify-between">
-          <dt className="text-slate-600">Subtotal</dt>
-          <dd className="text-slate-900">{formatINR(subtotal)}</dd>
+          <dt className="text-[var(--fg-muted)]">Subtotal</dt>
+          <dd className="font-semibold text-[var(--fg)] fig">₹{formatINR(subtotal)}</dd>
         </div>
+
         {appliedCoupon && (
-          <div className="flex justify-between text-emerald-700 font-medium">
+          <div className="flex justify-between text-[var(--ok)] font-medium">
             <dt>Coupon Discount ({appliedCoupon.code})</dt>
-            <dd>-{formatINR(discountAmount)}</dd>
+            <dd className="font-bold fig">-₹{formatINR(discountAmount)}</dd>
           </div>
         )}
+
         <div className="flex justify-between">
-          <dt className="text-slate-600">GST (18%)</dt>
-          <dd className="text-slate-900">{formatINR(dynamicGst)}</dd>
+          <dt className="text-[var(--fg-muted)] flex items-center gap-1.5">
+            <span>Logistics Dispatch</span>
+            <span className="flag flag-ok text-[11px] py-0.5">Free</span>
+          </dt>
+          <dd className="font-bold text-[var(--ok)]">FREE</dd>
         </div>
-        <div className="flex justify-between pt-2 border-t border-border-base">
-          <dt className="text-base font-bold text-slate-900">Total Amount</dt>
-          <dd className="text-base font-bold text-slate-900">{formatINR(dynamicTotal)}</dd>
+
+        <div className="flex justify-between">
+          <dt className="text-[var(--fg-muted)]">GST (18% included)</dt>
+          <dd className="font-semibold text-[var(--fg)] fig">₹{formatINR(dynamicGst)}</dd>
+        </div>
+
+        <div className="flex justify-between pt-3 border-t border-[var(--line-soft)] items-baseline">
+          <dt className="text-base font-bold text-[var(--fg)]">Total Payable</dt>
+          <dd className="text-2xl font-black text-[var(--fg)] fig tracking-tight">
+            ₹{formatINR(dynamicTotal)}
+          </dd>
         </div>
       </dl>
+
+      <div className="pt-3 border-t border-[var(--line-soft)] space-y-2 text-xs text-[var(--fg-muted)]">
+        <div className="flex items-center gap-2">
+          <Truck size={14} className="text-[var(--ok)] flex-shrink-0" />
+          <span>Carefully packed with transit seals & heavy-duty crates.</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <FileText size={14} className="text-[var(--accent)] flex-shrink-0" />
+          <span>GST tax invoice included in shipment box.</span>
+        </div>
+      </div>
     </div>
   );
 
@@ -232,125 +346,295 @@ export default function CheckoutForm({
       type="submit"
       form="checkout-form"
       disabled={isPending}
-      className="w-full min-h-[52px] flex items-center justify-center gap-2 rounded-md bg-brand-orange-600 text-white text-sm font-bold uppercase tracking-wide hover:opacity-90 disabled:opacity-50 transition-opacity"
+      className="act act-fill act-big act-wide text-base font-bold uppercase tracking-wider shadow-sm disabled:opacity-50"
     >
-      <Lock size={17} />
-      {isPending ? "Placing order…" : "Place Order"}
+      <Lock size={18} />
+      {isPending ? "Confirming Order…" : "Place Order"}
     </button>
   );
 
   return (
-    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8 lg:items-start">
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-10 lg:items-start">
       <form id="checkout-form" onSubmit={handleSubmit} className="space-y-8">
-        <div className="flex items-start gap-3 bg-surface-sunken border border-border-base rounded-lg p-4">
-          <Lock size={18} className="text-slate-900 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Secure Checkout</p>
-            <p className="text-xs text-slate-600">Your transaction is encrypted and safe.</p>
+        {/* ── Section 1: Shipping Address ──────────────────────────────────── */}
+        <section className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6 space-y-5">
+          <div className="flex items-center justify-between border-b border-[var(--line-soft)] pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 h-6 rounded-full bg-[var(--ink-900)] text-white text-xs font-bold flex items-center justify-center">
+                1
+              </span>
+              <h2 className="text-lg font-bold text-[var(--fg)] tracking-tight">
+                Consignee & Delivery Address
+              </h2>
+            </div>
+            <span className="text-xs text-[var(--fg-muted)]">* Required fields</span>
           </div>
-        </div>
 
-        {/* Shipping address */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Shipping Address</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field name="fullName" label="Full Name" defaultValue={defaultName} required />
-            <Field name="phone" label="Mobile Number" type="tel" placeholder="10-digit mobile" required />
-            <Field name="addressLine1" label="Address Line 1" className="sm:col-span-2" required />
-            <Field name="addressLine2" label="Address Line 2 (optional)" className="sm:col-span-2" />
-            <Field name="city" label="City" required />
-            <Field name="state" label="State" required />
-            <Field name="pincode" label="Pincode" placeholder="6-digit pincode" required />
+            <Field
+              name="fullName"
+              label="Full Name / Receiver Name"
+              defaultValue={defaultName}
+              placeholder="e.g. Ramesh Chandra Mishra"
+              required
+            />
+            <Field
+              name="phone"
+              label="Mobile Number (10 digits)"
+              type="tel"
+              placeholder="e.g. 9876543210"
+              required
+            />
+            <Field
+              name="addressLine1"
+              label="Street Address / Building / Flat"
+              placeholder="e.g. Shop 4, Station Road, Opp. Market"
+              className="sm:col-span-2"
+              required
+            />
+            <Field
+              name="addressLine2"
+              label="Area / Landmark / Colony (Optional)"
+              placeholder="e.g. Near Power Substation, Civil Lines"
+              className="sm:col-span-2"
+            />
+            <div>
+              <Field
+                name="pincode"
+                label="Delivery PIN Code"
+                placeholder="6-digit PIN"
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                onBlur={handlePincodeBlur}
+                className="fig"
+                required
+              />
+              {pincodeStatus.loading && (
+                <p className="text-xs text-[var(--fg-muted)] mt-1.5 flex items-center gap-1.5">
+                  <Loader2 size={13} className="animate-spin text-[var(--accent)]" />
+                  Checking courier transit routes…
+                </p>
+              )}
+              {pincodeStatus.result && (
+                <div
+                  className={cn(
+                    "mt-2 p-2.5 rounded text-xs border flex items-start gap-2",
+                    pincodeStatus.result.ok
+                      ? "bg-[var(--ok-wash)] border-[var(--ok)]/30 text-[var(--ok)]"
+                      : "bg-red-50 border-red-200 text-[var(--signal-700)]"
+                  )}
+                >
+                  {pincodeStatus.result.ok ? (
+                    <>
+                      <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold">
+                          Direct service active to {pincodeStatus.result.zone}
+                        </p>
+                        <p className="text-[11px] mt-0.5 opacity-90">
+                          Estimated delivery by <strong>{pincodeStatus.result.etaDate}</strong> via{" "}
+                          {pincodeStatus.result.couriers?.join(", ") || "Express Cargo"}.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                      <span>{pincodeStatus.result.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Field
+              name="city"
+              label="City / Town"
+              placeholder="e.g. Bhadohi / Varanasi"
+              required
+            />
+
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="checkout-state"
+                className="block text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1.5"
+              >
+                State
+              </label>
+              <select
+                id="checkout-state"
+                name="state"
+                defaultValue="Uttar Pradesh"
+                required
+                className="w-full min-h-[48px] px-3 bg-[var(--surface)] border border-[var(--line)] rounded text-sm text-[var(--fg)] focus:outline-none focus:border-[var(--accent)]"
+              >
+                {INDIAN_STATES.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </section>
 
-        {/* Shipping method */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Shipping Method</h2>
-          <div className="space-y-3">
-            {SHIPPING_METHODS.map((m) => (
-              <label
-                key={m.value}
-                className={cn(
-                  "flex items-center gap-3 min-h-[64px] px-4 rounded-md border cursor-pointer transition-colors",
-                  shipping === m.value
-                    ? "border-slate-900 border-2 bg-surface"
-                    : "border-border-base bg-surface hover:border-slate-300"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="shippingMethod"
-                  value={m.value}
-                  checked={shipping === m.value}
-                  onChange={() => setShipping(m.value)}
-                  className="w-4 h-4 accent-slate-900"
-                />
-                <span className="flex-1">
-                  <span className="block text-sm font-bold text-slate-900">{m.label}</span>
-                  <span className="block text-xs text-slate-600">{m.detail}</span>
-                </span>
-                <span className="text-sm font-bold text-slate-900">{m.price}</span>
-              </label>
-            ))}
-          </div>
+        {/* ── Section 2: GST Invoice Option (§6.6) ─────────────────────────── */}
+        <section className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6 space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={needsGstInvoice}
+              onChange={(e) => setNeedsGstInvoice(e.target.checked)}
+              className="mt-1 w-4 h-4 rounded text-[var(--accent)] focus:ring-[var(--accent)]"
+            />
+            <div>
+              <span className="text-sm font-bold text-[var(--fg)] block">
+                I need a commercial GST Tax Invoice in my firm's name
+              </span>
+              <span className="text-xs text-[var(--fg-muted)] block mt-0.5">
+                Enable input tax credit (ITC) on this business purchase.
+              </span>
+            </div>
+          </label>
+
+          {needsGstInvoice && (
+            <div className="pt-4 border-t border-[var(--line-soft)] grid gap-4 sm:grid-cols-2">
+              <Field
+                name="firmName"
+                label="Registered Business / Firm Name"
+                placeholder="e.g. Mishra Electricals & Contractors"
+                value={firmName}
+                onChange={(e) => setFirmName(e.target.value)}
+                required={needsGstInvoice}
+              />
+              <Field
+                name="gstin"
+                label="15-Digit GSTIN"
+                placeholder="e.g. 09AAACV1234E1Z5"
+                value={gstin}
+                onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                className="font-mono uppercase"
+                required={needsGstInvoice}
+              />
+              <p className="text-xs text-[var(--fg-muted)] sm:col-span-2">
+                Your GSTIN will be verified and printed on the official invoice for GST credit filing.
+              </p>
+            </div>
+          )}
         </section>
 
-        {/* Payment method */}
-        <section>
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Payment Method</h2>
-          <div className="space-y-3">
-            {PAYMENT_METHODS.map(({ value, label, icon: Icon }) => (
-              <label
-                key={value}
-                className={cn(
-                  "flex items-center gap-3 min-h-[56px] px-4 rounded-md border cursor-pointer transition-colors",
-                  payment === value
-                    ? "border-slate-900 border-2 bg-surface"
-                    : "border-border-base bg-surface hover:border-slate-300"
-                )}
-              >
-                <input
-                  type="radio"
-                  name="paymentChoice"
-                  value={value}
-                  checked={payment === value}
-                  onChange={() => setPayment(value)}
-                  className="w-4 h-4 accent-brand-orange-600"
-                />
-                <Icon size={20} className="text-slate-900" />
-                <span className="text-sm font-bold text-slate-900">{label}</span>
-              </label>
-            ))}
+        {/* ── Section 3: Payment Method (§6.6 Equal-Legitimacy Cards) ──────── */}
+        <section className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6 space-y-4">
+          <div className="flex items-center gap-2.5 border-b border-[var(--line-soft)] pb-3">
+            <span className="w-6 h-6 rounded-full bg-[var(--ink-900)] text-white text-xs font-bold flex items-center justify-center">
+              2
+            </span>
+            <h2 className="text-lg font-bold text-[var(--fg)] tracking-tight">
+              Payment Choice
+            </h2>
+          </div>
+
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            {/* Pay Now Option */}
+            <label
+              className={cn(
+                "p-4 rounded-lg border-2 cursor-pointer flex flex-col justify-between gap-3 transition-colors",
+                payment === "RAZORPAY"
+                  ? "border-[var(--accent)] bg-[var(--accent-wash)]"
+                  : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--fg-quiet)]"
+              )}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="radio"
+                    name="paymentChoice"
+                    value="RAZORPAY"
+                    checked={payment === "RAZORPAY"}
+                    onChange={() => setPayment("RAZORPAY")}
+                    className="w-4 h-4 text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                  <span className="text-sm font-bold text-[var(--fg)]">
+                    Pay Now
+                  </span>
+                </div>
+                <Smartphone size={20} className="text-[var(--accent)]" />
+              </div>
+              <div>
+                <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+                  UPI (PhonePe, GPay, Paytm), Credit/Debit Cards, or Net Banking. Instant digital receipt.
+                </p>
+              </div>
+            </label>
+
+            {/* Cash on Delivery Option (Equal Legitimacy) */}
+            <label
+              className={cn(
+                "p-4 rounded-lg border-2 cursor-pointer flex flex-col justify-between gap-3 transition-colors",
+                payment === "COD"
+                  ? "border-[var(--ok)] bg-[var(--ok-wash)]"
+                  : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--fg-quiet)]"
+              )}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="radio"
+                    name="paymentChoice"
+                    value="COD"
+                    checked={payment === "COD"}
+                    onChange={() => setPayment("COD")}
+                    className="w-4 h-4 text-[var(--ok)] focus:ring-[var(--ok)]"
+                  />
+                  <span className="text-sm font-bold text-[var(--fg)]">
+                    Cash on Delivery (COD)
+                  </span>
+                </div>
+                <Banknote size={20} className="text-[var(--ok)]" />
+              </div>
+              <div>
+                <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+                  Pay cash or scan UPI QR with courier partner at the doorstep upon arrival. Zero advance.
+                </p>
+              </div>
+            </label>
           </div>
         </section>
 
         {error && (
-          <p className="flex items-center gap-1.5 text-sm font-medium text-danger" role="alert">
-            <AlertCircle size={16} />
-            {error}
-          </p>
+          <div
+            className="p-4 rounded-lg bg-red-50 border border-red-200 text-[var(--signal-700)] text-sm flex items-center gap-2.5"
+            role="alert"
+          >
+            <AlertCircle size={18} className="flex-shrink-0" />
+            <span>{error}</span>
+          </div>
         )}
 
-        {/* Desktop place-order lives in the summary column */}
+        {/* Mobile Summary & Trigger */}
         <div className="lg:hidden">{summary}</div>
       </form>
 
-      <div className="hidden lg:block lg:sticky lg:top-24 space-y-4">
+      {/* ── Desktop Sticky Summary Column (§6.6) ────────────────────────── */}
+      <aside className="hidden lg:block lg:sticky lg:top-24 space-y-4">
         {summary}
         {placeOrderButton}
-      </div>
+      </aside>
 
-      {/* Mobile sticky order bar */}
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 bg-surface border-t border-border-base shadow-lg px-4 py-3">
+      {/* ── Mobile Sticky Bar ────────────────────────────────────────────── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--surface)] border-t border-[var(--line)] shadow-lg px-4 py-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-bold text-slate-900">Total Amount</span>
-          <span className="text-base font-bold text-slate-900">{formatINR(dynamicTotal)}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)]">
+            Total to Pay
+          </span>
+          <span className="text-xl font-black text-[var(--fg)] fig">
+            ₹{formatINR(dynamicTotal)}
+          </span>
         </div>
         {placeOrderButton}
       </div>
 
-      <div className="h-36 lg:hidden" aria-hidden />
+      <div className="h-28 lg:hidden" aria-hidden />
     </div>
   );
 }
@@ -362,6 +646,9 @@ function Field({
   placeholder,
   required,
   defaultValue,
+  value,
+  onChange,
+  onBlur,
   className,
 }: {
   name: string;
@@ -370,15 +657,18 @@ function Field({
   placeholder?: string;
   required?: boolean;
   defaultValue?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   className?: string;
 }) {
   return (
     <div className={className}>
       <label
         htmlFor={`checkout-${name}`}
-        className="block text-xs font-bold uppercase tracking-wider text-muted mb-1.5"
+        className="block text-xs font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1.5"
       >
-        {label}
+        {label} {required && <span className="text-[var(--signal-700)]">*</span>}
       </label>
       <input
         id={`checkout-${name}`}
@@ -387,7 +677,10 @@ function Field({
         placeholder={placeholder}
         required={required}
         defaultValue={defaultValue}
-        className="w-full min-h-[44px] px-3 bg-surface border border-border-base rounded-md text-sm text-slate-900 placeholder-muted focus:outline-none focus:ring-2 focus:ring-slate-900"
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        className="w-full min-h-[48px] px-3 bg-[var(--surface)] border border-[var(--line)] rounded text-base text-[var(--fg)] placeholder-[var(--fg-quiet)] focus:outline-none focus:border-[var(--accent)]"
       />
     </div>
   );

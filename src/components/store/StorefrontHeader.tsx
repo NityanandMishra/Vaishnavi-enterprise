@@ -11,22 +11,14 @@ import {
   X,
   ChevronDown,
   LayoutGrid,
+  Phone,
+  Zap,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { PINNED_LIMIT, type NavCategory } from "@/lib/nav";
+import type { NavCategory } from "@/lib/nav";
 import ComingSoonTag from "./ComingSoonTag";
 
-/**
- * Storefront header.
- *
- * The bar renders a fixed number of inline slots — one mega-menu trigger plus
- * at most PINNED_LIMIT category links — so its height cannot change with the
- * size of the catalogue. Listing every category inline was not an option:
- * measured at 1280px the bar has ~725px of free width while the ten current
- * top-level categories need ~1189px, so they would wrap and grow the header.
- * Everything beyond the pinned few lives in the mega-menu instead.
- */
 export default function StorefrontHeader({ categories }: { categories: NavCategory[] }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,11 +29,7 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
   const router = useRouter();
   const pathname = usePathname();
 
-  const pinned = categories.slice(0, PINNED_LIMIT);
-
-  // The header sits in the layout and never remounts, so every transient bit
-  // of open state has to be cleared by hand on navigation — the search overlay
-  // included, or it stays pinned open over whatever page you land on.
+  // Close menus on page navigation
   useEffect(() => {
     setMegaOpen(false);
     setMobileMenuOpen(false);
@@ -49,11 +37,6 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
     setSearchQuery("");
   }, [pathname]);
 
-  /**
-   * Closed on tap rather than on the pathname change alone. A navigation only
-   * commits once the destination has rendered, so waiting on it left the menu
-   * sitting open with nothing happening — long enough to read as a dead link.
-   */
   const closeMenus = () => {
     setMobileMenuOpen(false);
     setMegaOpen(false);
@@ -67,11 +50,6 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
     }
     function onPointer(e: MouseEvent) {
       const target = e.target as Node;
-      // The panel is a sibling of the trigger, not a descendant, so it has to
-      // be tested separately. Checking only the trigger treated every click
-      // inside the panel as an outside click: mousedown unmounted the panel
-      // before mouseup, the anchor vanished, and the click never fired — the
-      // menu closed and navigation silently never happened.
       const insideTrigger = megaRef.current?.contains(target);
       const insidePanel = megaPanelRef.current?.contains(target);
       if (!insideTrigger && !insidePanel) setMegaOpen(false);
@@ -95,260 +73,247 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
   }
 
   return (
-    <header className="sticky top-0 z-chrome bg-surface border-b border-border-base shadow-sm">
-      <div className="max-w-content mx-auto px-4 lg:px-8 h-16 flex items-center gap-4">
+    <header className="top shadow-sm">
+      <div className="wrap">
+        <div className="top-in">
+          {/* Mobile Menu Hamburger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="ib m-only"
+            aria-label="Open Navigation Menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
 
-        {/* Mobile Menu Toggle */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden -ml-2 p-2.5 text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
-          aria-label="Menu"
-        >
-          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+          {/* Brand Mark (§5.5) */}
+          <Link href="/" className="mark flex-shrink-0" onClick={closeMenus}>
+            <div className="w-9 h-9 rounded bg-[var(--accent)] text-white flex items-center justify-center font-bold flex-shrink-0">
+              <Zap size={20} className="fill-white" />
+            </div>
+            <div className="min-w-0">
+              <b className="tracking-tight">VAISHNAVI</b>
+              <small>SURIYAWAN · BHADOHI</small>
+            </div>
+          </Link>
 
-        {/* Logo */}
-        <Link href="/" aria-label="Vaishnavi Enterprises — home" className="flex-shrink-0 md:mr-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Vaishnavi Enterprises" className="h-10 w-auto object-contain" />
-        </Link>
-
-        {/* Desktop nav — a fixed number of slots, never the whole catalogue */}
-        {categories.length > 0 && (
-          <nav className="hidden md:flex items-center gap-1 min-w-0" ref={megaRef}>
+          {/* Desktop Navigation Links (Max 4 links as specified in §5.5) */}
+          <nav className="topnav" ref={megaRef}>
             <button
               type="button"
               onClick={() => setMegaOpen((o) => !o)}
               aria-expanded={megaOpen}
-              aria-controls="mega-menu"
-              className={cn(
-                "flex-shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-semibold transition-colors",
-                megaOpen
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-surface-alt hover:text-slate-900"
-              )}
+              className="inline-flex items-center gap-1.5 font-semibold text-[var(--fg)] hover:text-[var(--accent-ink)]"
             >
               <LayoutGrid size={16} />
-              Categories
+              <span>Categories</span>
               <ChevronDown
-                size={15}
-                className={cn("transition-transform", megaOpen && "rotate-180")}
+                size={14}
+                className={cn("transition-transform duration-200", megaOpen && "rotate-180")}
               />
             </button>
 
-            {pinned.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/categories/${cat.slug}`}
-                // Capped and truncated so a long category name can never push
-                // the row to a second line.
-                className="hidden lg:block flex-shrink-0 max-w-[150px] truncate h-9 leading-9 px-3 rounded-md text-sm font-medium text-slate-600 hover:bg-surface-alt hover:text-slate-900 transition-colors"
-              >
-                {cat.name}
-              </Link>
-            ))}
+            <Link
+              href="/categories/fans"
+              className={cn(pathname.includes("/fans") && "active")}
+            >
+              Fans & Electricals
+            </Link>
+
+            <Link
+              href="/solar"
+              className={cn(pathname.includes("/solar") && "active")}
+            >
+              Solar Rooftop
+            </Link>
+
+            <Link
+              href="/categories/electric-vehicles"
+              className={cn(pathname.includes("/electric-vehicles") && "active")}
+            >
+              E-Vehicles (Inquire)
+            </Link>
           </nav>
-        )}
 
-        <div className="flex-1" />
+          {/* Inline Search (≥768px, §5.5) */}
+          <div className="find">
+            <Search size={18} />
+            <form onSubmit={handleSearch} className="w-full">
+              <input
+                type="search"
+                placeholder="Search wires, fans, lights, UPS..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search catalogue"
+              />
+            </form>
+          </div>
 
-        {/* Desktop Search Bar */}
-        <form
-          onSubmit={handleSearch}
-          className={cn(
-            "hidden lg:flex items-center gap-2 bg-surface-alt border border-border-base rounded-md px-3 py-2 transition-all duration-300",
-            searchOpen ? "ring-2 ring-slate-900 w-72" : "w-52"
-          )}
-        >
-          <Search size={16} className="text-muted flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search products…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchOpen(true)}
-            onBlur={() => !searchQuery && setSearchOpen(false)}
-            className="bg-transparent text-sm text-slate-900 placeholder-muted outline-none w-full"
-          />
-        </form>
+          {/* Action Controls */}
+          <div className="top-acts">
+            {/* Mobile Search Toggle */}
+            <button
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="ib md:hidden"
+              aria-label="Search"
+            >
+              <Search size={20} />
+            </button>
 
-        {/* Action Icons */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setSearchOpen(!searchOpen)}
-            className="lg:hidden p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
-            aria-label="Search"
-          >
-            <Search size={22} />
-          </button>
+            <Link href="/wishlist" className="ib d-only" aria-label="Saved Items">
+              <Heart size={20} />
+            </Link>
 
-          <Link
-            href="/wishlist"
-            className="hidden sm:flex p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
-            aria-label="Wishlist"
-          >
-            <Heart size={22} />
-          </Link>
+            <Link href="/cart" className="ib relative" aria-label="Shopping Cart">
+              <ShoppingCart size={20} />
+            </Link>
 
-          <Link
-            href="/cart"
-            className="p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
-            aria-label="Cart"
-          >
-            <ShoppingCart size={22} />
-          </Link>
-
-          <Link
-            href="/account"
-            className="hidden sm:flex p-2.5 text-slate-700 hover:text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
-            aria-label="Account"
-          >
-            <User size={22} />
-          </Link>
+            <Link href="/account" className="ib d-only" aria-label="Account">
+              <User size={20} />
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Mega-menu — grows downward as a panel, never affecting the bar */}
+      {/* Mobile Search Input Drawer (when toggled on small screens) */}
+      {searchOpen && (
+        <div className="md:hidden border-t border-[var(--line)] bg-[var(--surface)] p-3">
+          <form onSubmit={handleSearch} className="relative">
+            <input
+              type="search"
+              autoFocus
+              placeholder="Search catalogue by name or SKU..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="inp"
+            />
+          </form>
+        </div>
+      )}
+
+      {/* Mega-Menu Panel (§5.5) */}
       {megaOpen && (
         <div
           id="mega-menu"
           ref={megaPanelRef}
-          className="hidden md:block absolute left-0 right-0 top-full bg-surface border-b border-border-base shadow-lg"
+          className="absolute left-0 right-0 top-full bg-[var(--surface)] border-b border-[var(--line)] shadow-lg z-50 animate-in fade-in slide-in-from-top-1"
         >
-          <div className="max-w-content mx-auto px-4 lg:px-8 py-6 max-h-[70vh] overflow-y-auto">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-6">
+          <div className="wrap py-8 max-h-[75vh] overflow-y-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {categories.map((cat) => (
                 <div key={cat.id} className="min-w-0">
                   <Link
                     href={`/categories/${cat.slug}`}
                     onClick={closeMenus}
-                    className="block text-sm font-bold text-slate-900 hover:text-brand-orange-600 transition-colors mb-2 truncate"
+                    className="block font-bold text-[15px] text-[var(--fg)] hover:text-[var(--accent-ink)] transition-colors mb-2 truncate"
                   >
                     {cat.name}
                   </Link>
-                  {cat.children.length > 0 ? (
+                  {cat.children && cat.children.length > 0 ? (
                     <ul className="space-y-1.5">
-                      {cat.children.map((sub) =>
-                        sub.comingSoon ? (
-                          <li
-                            key={sub.id}
-                            className="flex items-center gap-1.5 text-sm text-muted cursor-default"
-                            title="No products listed yet"
-                          >
-                            <span className="truncate">{sub.name}</span>
-                            <ComingSoonTag />
-                          </li>
-                        ) : (
-                          <li key={sub.id}>
+                      {cat.children.map((sub) => (
+                        <li key={sub.id}>
+                          {sub.comingSoon ? (
+                            <span className="flex items-center gap-1.5 text-xs text-[var(--fg-quiet)]">
+                              <span className="truncate">{sub.name}</span>
+                              <ComingSoonTag />
+                            </span>
+                          ) : (
                             <Link
                               href={`/categories/${sub.slug}`}
                               onClick={closeMenus}
-                              className="block text-sm text-slate-600 hover:text-brand-orange-600 transition-colors truncate"
+                              className="block text-xs text-[var(--fg-muted)] hover:text-[var(--accent-ink)] truncate"
                             >
                               {sub.name}
                             </Link>
-                          </li>
-                        )
-                      )}
+                          )}
+                        </li>
+                      ))}
                     </ul>
                   ) : (
-                    <p className="text-xs text-muted">Browse all items</p>
+                    <p className="text-xs text-[var(--fg-quiet)]">Browse catalogue</p>
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="mt-6 pt-4 border-t border-border-base">
+            <div className="mt-6 pt-4 border-t border-[var(--line)] flex items-center justify-between">
               <Link
                 href="/categories"
                 onClick={closeMenus}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 hover:text-brand-orange-600 transition-colors"
+                className="font-semibold text-sm text-[var(--accent-ink)] hover:underline"
               >
-                View all categories
+                View all trade categories →
               </Link>
+              <div className="text-xs text-[var(--fg-quiet)]">
+                Local Pickup & Authorised Warranty in Suriyawan, Bhadohi
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Mobile Search Overlay */}
-      {searchOpen && (
-        <div className="lg:hidden px-4 pb-3 border-b border-border-base">
-          <form onSubmit={handleSearch} className="flex items-center gap-2 bg-surface-alt border border-border-base rounded-md px-3 py-2.5 ring-2 ring-slate-900">
-            <Search size={16} className="text-muted flex-shrink-0" />
-            <input
-              type="text"
-              placeholder="Search products…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              autoFocus
-              className="bg-transparent text-sm text-slate-900 placeholder-muted outline-none flex-1"
-            />
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search">
-                <X size={16} className="text-muted" />
-              </button>
-            )}
-          </form>
-        </div>
-      )}
-
-      {/* Mobile drawer — scrolls, so category count is unconstrained here */}
+      {/* Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-border-base bg-surface max-h-[75vh] overflow-y-auto">
-          <nav className="flex flex-col px-4 py-3">
-            {categories.map((cat) => (
-              <div key={cat.id} className="border-b border-border-base last:border-0 py-1">
+        <div className="fixed inset-0 top-[var(--hdr)] z-40 bg-black/40 backdrop-blur-xs md:hidden">
+          <div className="bg-[var(--surface)] w-4/5 max-w-sm h-full p-6 overflow-y-auto shadow-2xl flex flex-col">
+            <div className="font-bold text-xs uppercase tracking-wider text-[var(--fg-quiet)] mb-3">
+              Shop Categories
+            </div>
+            <div className="space-y-2 mb-6">
+              {categories.slice(0, 8).map((cat) => (
                 <Link
+                  key={cat.id}
                   href={`/categories/${cat.slug}`}
                   onClick={closeMenus}
-                  className="block py-3 px-3 -mx-1 text-sm font-semibold text-slate-900 hover:bg-surface-alt rounded-md transition-colors"
+                  className="block py-2 text-sm font-semibold text-[var(--fg)] hover:text-[var(--accent-ink)] border-b border-[var(--line-soft)]"
                 >
                   {cat.name}
                 </Link>
-                {cat.children.length > 0 && (
-                  <ul className="pb-2">
-                    {cat.children.map((sub) =>
-                      sub.comingSoon ? (
-                        <li
-                          key={sub.id}
-                          className="flex items-center gap-2 py-2.5 pl-6 pr-3 -mx-1 text-sm text-muted"
-                        >
-                          {sub.name}
-                          <ComingSoonTag />
-                        </li>
-                      ) : (
-                        <li key={sub.id}>
-                          <Link
-                            href={`/categories/${sub.slug}`}
-                            onClick={closeMenus}
-                            className="block py-2.5 pl-6 pr-3 -mx-1 text-sm text-slate-600 hover:bg-surface-alt rounded-md transition-colors"
-                          >
-                            {sub.name}
-                          </Link>
-                        </li>
-                      )
-                    )}
-                  </ul>
-                )}
-              </div>
-            ))}
-
-            {[
-              { href: "/categories", label: "All Categories" },
-              { href: "/wishlist", label: "Wishlist" },
-              { href: "/account", label: "My Account" },
-            ].map(({ href, label }) => (
+              ))}
               <Link
-                key={href}
-                href={href}
+                href="/categories"
                 onClick={closeMenus}
-                className="py-3 px-3 -mx-1 mt-1 text-sm font-medium text-slate-700 hover:bg-surface-alt rounded-md transition-colors"
+                className="block py-2 text-sm font-bold text-[var(--accent-ink)]"
               >
-                {label}
+                All 9 Categories →
               </Link>
-            ))}
-          </nav>
+            </div>
+
+            <div className="font-bold text-xs uppercase tracking-wider text-[var(--fg-quiet)] mb-3">
+              Quick Links
+            </div>
+            <div className="space-y-2 mb-6">
+              <Link
+                href="/solar"
+                onClick={closeMenus}
+                className="block py-1.5 text-sm font-medium text-[var(--fg)]"
+              >
+                Solar Rooftop Assessment
+              </Link>
+              <Link
+                href="/wishlist"
+                onClick={closeMenus}
+                className="block py-1.5 text-sm font-medium text-[var(--fg)]"
+              >
+                Saved Wishlist
+              </Link>
+              <Link
+                href="/account"
+                onClick={closeMenus}
+                className="block py-1.5 text-sm font-medium text-[var(--fg)]"
+              >
+                My Account & Orders
+              </Link>
+            </div>
+
+            <div className="mt-auto pt-4 border-t border-[var(--line)] text-xs text-[var(--fg-muted)] space-y-2">
+              <div className="flex items-center gap-2 text-[var(--fg)] font-semibold">
+                <Phone size={14} className="text-[var(--accent)]" />
+                <span>+91 73888 47575</span>
+              </div>
+              <p>Station Road, Suriyawan, Bhadohi, UP</p>
+            </div>
+          </div>
         </div>
       )}
     </header>

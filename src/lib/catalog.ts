@@ -26,23 +26,23 @@ export function toProductCardData(
   const image = product.images[0]?.image;
   const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
   const priceVariant = product.variants.find((v) => v.isDefault) ?? product.variants[0];
-  const reviewCount = product.reviews.length;
-  const avgRating =
-    reviewCount > 0 ? product.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount : null;
 
   return {
     id: product.id,
+    slug: product.slug ?? product.id,
     title: product.title,
+    shortDescription: product.shortDescription ?? "",
     basePrice: priceVariant?.price ?? product.basePrice,
     mrp: priceVariant?.mrp ?? null,
     checkoutMode: product.checkoutMode,
     brandName: product.brand?.name ?? null,
     imageUrl: image?.url ?? null,
     imageAlt: image?.alt ?? null,
+    totalStock,
+    isAvailable: product.isAvailable,
+    sourcingLeadDays: product.sourcingLeadDays ?? 5,
     badge: stockStateFor(product.stockMode, product.isAvailable, totalStock),
-    rating: avgRating,
-    reviewCount,
-    lowStockCount: totalStock > 0 && totalStock <= 5 ? totalStock : null,
+    lowStockCount: totalStock > 0 && totalStock <= 3 ? totalStock : null,
     wishlisted: opts?.wishlisted ?? false,
   };
 }

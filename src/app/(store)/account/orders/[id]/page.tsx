@@ -95,10 +95,10 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   const steps = timelineFor(order.status, order.createdAt);
 
   return (
-    <div className="max-w-content mx-auto px-4 lg:px-8 pt-4 lg:pt-6 pb-4">
+    <div className="wrap pt-6 pb-16">
       <Link
         href="/account"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--fg-muted)] hover:text-[var(--accent-ink)] transition-colors"
       >
         <ArrowLeft size={16} /> Back to Account
       </Link>

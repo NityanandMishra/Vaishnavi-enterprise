@@ -9,9 +9,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   const categories = await getNavCategories();
 
   return (
-    <div className="min-h-screen flex flex-col bg-surface-alt">
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--fg)]">
       <StorefrontHeader categories={categories} />
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1 gap-nav">
         {children}
       </main>
       <StorefrontFooter />

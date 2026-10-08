@@ -6,30 +6,22 @@ import Breadcrumbs from "@/components/store/Breadcrumbs";
 import SolarCalculator from "@/components/store/SolarCalculator";
 
 export const metadata: Metadata = {
-  title: "Solar Solutions & PM Surya Ghar Calculator",
+  title: "Solar Solutions & PM Surya Ghar Calculator | Vaishnavi Enterprises",
   description:
     "Calculate PM Surya Ghar Muft Bijli Yojana rooftop solar subsidy, electricity bill savings, and book free site survey in Suriyawan, Bhadohi and Eastern UP.",
 };
-
-/**
- * Solar consultancy landing page.
- *
- * Scope is deliberately limited to residential rooftop and solar lighting —
- * the two things the business actually delivers today. Commercial and
- * industrial rooftop is a future offering and is not advertised here.
- */
 
 const offerings = [
   {
     icon: Sun,
     title: "Rooftop solar for homes",
-    body: "Grid-tied rooftop systems for independent houses, housing societies, and small establishments. Sized to your actual consumption, installed and commissioned by our own team.",
-    points: ["Site survey before any quote", "Genuine tier-1 panels and inverters", "GST invoice on every order"],
+    body: "Grid-tied rooftop systems for independent houses, housing societies, and small establishments. Sized to your actual consumption, installed and commissioned by our own local team.",
+    points: ["Site survey before any quote", "Genuine tier-1 panels and inverters", "Full GST invoice on every order"],
   },
   {
     icon: Lightbulb,
     title: "Solar lighting",
-    body: "Standalone solar street lights, gate lights, and outdoor area lighting — no wiring runs, no meter load, and nothing added to your monthly bill.",
+    body: "Standalone solar street lights, gate lights, and outdoor area lighting — zero wiring runs, no meter load, and nothing added to your monthly bill.",
     points: ["Integrated panel and battery units", "Dusk-to-dawn automatic operation", "Suited to gates, lanes, and campuses"],
   },
 ];
@@ -49,37 +41,36 @@ const assurances = [
 
 export default function SolarPage() {
   return (
-    <>
-      <div className="max-w-content mx-auto px-4 lg:px-8 pt-4">
+    <div className="min-h-screen bg-[var(--bg)] pb-16">
+      <div className="wrap pt-4 pb-2">
         <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Solar Solutions" }]} />
       </div>
 
       {/* ── Hero ───────────────────────────────────────────────────────── */}
-      <section className="relative bg-surface-inverse overflow-hidden">
+      <section className="relative bg-[var(--ink-900)] text-white overflow-hidden py-14 lg:py-20 border-b border-[var(--line-soft)]">
         <div
-          className="absolute inset-0 opacity-40"
+          className="absolute inset-0 opacity-20 pointer-events-none"
           style={{
-            backgroundImage:
-              "radial-gradient(circle at 78% 25%, rgba(234,88,12,0.55), transparent 55%), radial-gradient(circle at 12% 85%, rgba(73,124,255,0.35), transparent 50%)",
+            backgroundImage: "radial-gradient(circle at 75% 30%, var(--copper-lit), transparent 50%)",
           }}
         />
-        <div className="relative max-w-content mx-auto px-4 lg:px-8 py-12 lg:py-20 lg:flex lg:items-center lg:gap-16">
+        <div className="relative wrap lg:flex lg:items-center lg:gap-16">
           <div className="lg:flex-1">
-            <span className="inline-block text-xs font-bold uppercase tracking-widest text-brand-orange-400 mb-3">
-              Solar Solutions
+            <span className="inline-block text-xs font-bold uppercase tracking-widest text-[var(--copper-lit)] mb-3">
+              Solar Solutions & Services
             </span>
-            <h1 className="text-3xl lg:text-5xl font-bold text-white leading-tight mb-4">
+            <h1 className="text-3xl lg:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tight">
               Lower your electricity bill, permanently
             </h1>
-            <p className="text-base lg:text-lg text-slate-300 max-w-xl mb-6">
+            <p className="text-base lg:text-lg text-[#C8D5E0] max-w-xl mb-6 leading-relaxed">
               Rooftop solar for homes and housing societies, and solar lighting for gates,
               lanes, and outdoor areas. We survey your site first, then quote — so the
               system you get is the one you actually need.
             </p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300">
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[#A9BCC9]">
               {assurances.map(({ icon: Icon, label }) => (
                 <span key={label} className="inline-flex items-center gap-2">
-                  <Icon size={16} className="text-brand-orange-400" />
+                  <Icon size={16} className="text-[var(--copper-lit)]" />
                   {label}
                 </span>
               ))}
@@ -90,25 +81,27 @@ export default function SolarPage() {
         </div>
       </section>
 
-      <div className="max-w-content mx-auto px-4 lg:px-8">
+      <div className="wrap">
         <div className="lg:flex lg:gap-12 lg:items-start">
           {/* ── Left: the offer ──────────────────────────────────────── */}
-          <div className="lg:flex-1 pt-12 lg:pt-16">
+          <div className="lg:flex-1 pt-10 lg:pt-14 space-y-12">
             <section>
-              <h2 className="text-2xl font-semibold text-slate-900 mb-6">What we install</h2>
+              <h2 className="text-2xl font-bold text-[var(--fg)] mb-5 tracking-tight">
+                What we install
+              </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {offerings.map(({ icon: Icon, title, body, points }) => (
                   <div
                     key={title}
-                    className="bg-surface border border-border-base rounded-lg p-5 flex flex-col"
+                    className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-5 flex flex-col"
                   >
-                    <Icon size={24} className="text-brand-orange-600 mb-3" />
-                    <h3 className="text-base font-semibold text-slate-900 mb-2">{title}</h3>
-                    <p className="text-sm text-slate-600 leading-relaxed mb-4">{body}</p>
-                    <ul className="mt-auto space-y-1.5">
+                    <Icon size={24} className="text-[var(--accent)] mb-3" />
+                    <h3 className="text-base font-bold text-[var(--fg)] mb-2">{title}</h3>
+                    <p className="text-sm text-[var(--fg-muted)] leading-relaxed mb-4">{body}</p>
+                    <ul className="mt-auto space-y-1.5 pt-3 border-t border-[var(--line-soft)]">
                       {points.map((p) => (
-                        <li key={p} className="text-xs text-slate-500 flex items-start gap-2">
-                          <span className="text-brand-orange-600 mt-0.5">•</span>
+                        <li key={p} className="text-xs text-[var(--fg-muted)] flex items-start gap-2">
+                          <span className="text-[var(--accent)] mt-0.5">•</span>
                           {p}
                         </li>
                       ))}
@@ -118,9 +111,11 @@ export default function SolarPage() {
               </div>
             </section>
 
-            <section className="pt-12">
-              <h2 className="text-2xl font-semibold text-slate-900 mb-2">How it works</h2>
-              <p className="text-sm text-slate-600 mb-6">
+            <section>
+              <h2 className="text-2xl font-bold text-[var(--fg)] mb-2 tracking-tight">
+                How it works
+              </h2>
+              <p className="text-sm text-[var(--fg-muted)] mb-6">
                 Four steps from enquiry to a working system. You are never charged for the
                 assessment or the proposal.
               </p>
@@ -128,54 +123,50 @@ export default function SolarPage() {
                 {steps.map(({ icon: Icon, title, body }, i) => (
                   <li
                     key={title}
-                    className="bg-surface border border-border-base rounded-lg p-5 flex gap-4"
+                    className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-5 flex gap-4"
                   >
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-brand-orange-50 text-brand-orange-600 flex items-center justify-center">
-                      <Icon size={18} />
+                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[var(--accent-wash)] text-[var(--accent)] flex items-center justify-center font-bold text-sm">
+                      {i + 1}
                     </div>
                     <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted block mb-0.5">
-                        Step {i + 1}
-                      </span>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-1">{title}</h3>
-                      <p className="text-xs text-slate-600 leading-relaxed">{body}</p>
+                      <h3 className="text-sm font-bold text-[var(--fg)] mb-1">{title}</h3>
+                      <p className="text-xs text-[var(--fg-muted)] leading-relaxed">{body}</p>
                     </div>
                   </li>
                 ))}
               </ol>
             </section>
 
-            <section className="pt-12">
-              <div className="bg-surface-sunken border border-border-base rounded-lg p-6 grid gap-5 sm:grid-cols-3">
+            <section>
+              <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6 grid gap-5 sm:grid-cols-3">
                 {assurances.map(({ icon: Icon, label, body }) => (
                   <div key={label}>
-                    <Icon size={20} className="text-brand-orange-600 mb-2" />
-                    <h3 className="text-sm font-semibold text-slate-900 mb-1">{label}</h3>
-                    <p className="text-xs text-slate-600 leading-relaxed">{body}</p>
+                    <Icon size={20} className="text-[var(--accent)] mb-2" />
+                    <h3 className="text-sm font-bold text-[var(--fg)] mb-1">{label}</h3>
+                    <p className="text-xs text-[var(--fg-muted)] leading-relaxed">{body}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            <p className="text-xs text-muted pt-8">
-              Looking for solar on a factory or commercial building? That is not something we
-              take on yet —{" "}
-              <Link href="/categories" className="underline hover:text-slate-700">
-                browse our electrical range
+            <p className="text-xs text-[var(--fg-muted)] pt-4">
+              Looking for commercial solar installations or bulk panels? That is handled under our trade quote desk —{" "}
+              <Link href="/products/havells-solar-panel-550w-mono-perc" className="underline hover:text-[var(--accent)]">
+                view 550W Mono PERC solar panels
               </Link>{" "}
-              or call us and we will point you in the right direction.
+              or message us directly on WhatsApp.
             </p>
           </div>
 
           {/* ── Right: the form (sticky on desktop) ──────────────────── */}
-          <div className="lg:w-[420px] flex-shrink-0 pt-12 lg:pt-0 lg:-mt-24 pb-4">
+          <div className="lg:w-[420px] flex-shrink-0 pt-10 lg:pt-0 lg:-mt-20 pb-4">
             <div className="lg:sticky lg:top-24">
-              <div className="mb-4 lg:bg-surface lg:rounded-t-lg">
-                <h2 className="text-lg font-semibold text-slate-900">
+              <div className="mb-4 bg-[var(--surface)] p-4 rounded-t-lg border border-b-0 border-[var(--line)]">
+                <h2 className="text-lg font-bold text-[var(--fg)]">
                   Book a free site assessment
                 </h2>
-                <p className="text-sm text-slate-600">
-                  Three quick questions. No payment, no obligation.
+                <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+                  Three quick questions. No payment, zero obligation.
                 </p>
               </div>
               <SolarInquiryForm />
@@ -184,10 +175,10 @@ export default function SolarPage() {
         </div>
 
         {/* ── Solar Sizing Calculator Section ────────────────────────────── */}
-        <section className="py-12 lg:py-16">
+        <section className="py-12 lg:py-16 border-t border-[var(--line)] mt-12">
           <SolarCalculator />
         </section>
       </div>
-    </>
+    </div>
   );
 }
