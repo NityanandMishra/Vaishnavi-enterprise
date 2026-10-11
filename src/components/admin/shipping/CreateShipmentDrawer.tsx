@@ -395,7 +395,7 @@ export default function CreateShipmentDrawer({
 
           {!destination.pincode && (
             <p className="text-xs text-red-600">
-              This order's delivery address has no pincode. Edit the shipping address first.
+              This order&apos;s delivery address has no pincode. Edit the shipping address first.
             </p>
           )}
           {destination.pincode && !fetchingCouriers && courierOptions.length === 0 && (
