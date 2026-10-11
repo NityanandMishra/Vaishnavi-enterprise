@@ -155,24 +155,69 @@ export const rateVersionInputSchema = z
     }
   });
 
+// Seller fields may be saved incrementally; invoice generation (src/lib/tax/seller.ts)
+// is what refuses to run until all of them are present.
+const optionalSellerText = (max: number) => z.string().trim().max(max).optional().default("");
+
 export const taxSettingsInputSchema = z
   .object({
     sellerStateCode: z.string().min(2).max(2),
-    sellerGstin: z.string().trim().toUpperCase(),
+    sellerGstin: z.string().trim().toUpperCase().optional().default(""),
+    sellerLegalName: optionalSellerText(120),
+    sellerTradeName: optionalSellerText(120),
+    sellerAddressLine1: optionalSellerText(200),
+    sellerAddressLine2: optionalSellerText(200),
+    sellerCity: optionalSellerText(80),
+    sellerPincode: optionalSellerText(6),
+    sellerPhone: optionalSellerText(20),
+    sellerEmail: optionalSellerText(120),
     pricingMode: z.enum(["EXCLUSIVE", "INCLUSIVE"]),
     defaultHsnId: z.string().nullable().optional(),
     confirmationToken: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const gstinCheck = validateGSTIN(data.sellerGstin);
-    if (!gstinCheck.isValid) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: gstinCheck.error || "Invalid GSTIN",
-        path: ["sellerGstin"],
-      });
+    if (data.sellerGstin) {
+      const gstinCheck = validateGSTIN(data.sellerGstin);
+      if (!gstinCheck.isValid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: gstinCheck.error || "Invalid GSTIN",
+          path: ["sellerGstin"],
+        });
+      } else if (data.sellerGstin.slice(0, 2) !== data.sellerStateCode) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `GSTIN starts with ${data.sellerGstin.slice(0, 2)} but the registered state code is ${data.sellerStateCode}`,
+          path: ["sellerGstin"],
+        });
+      }
+    }
+    if (data.sellerPincode && !/^d{6}$/.test(data.sellerPincode)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pincode must be 6 digits", path: ["sellerPincode"] });
+    }
+    if (data.sellerEmail && !/^[^s@]+@[^s@]+.[^s@]+$/.test(data.sellerEmail)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid email address", path: ["sellerEmail"] });
     }
   });
+
+/** Maps validated settings input to TaxSettings columns (empty strings become null). */
+export function taxSettingsUpdateData(data: z.infer<typeof taxSettingsInputSchema>) {
+  const orNull = (v: string) => v || null;
+  return {
+    sellerStateCode: data.sellerStateCode,
+    sellerGstin: orNull(data.sellerGstin),
+    sellerLegalName: orNull(data.sellerLegalName),
+    sellerTradeName: orNull(data.sellerTradeName),
+    sellerAddressLine1: orNull(data.sellerAddressLine1),
+    sellerAddressLine2: orNull(data.sellerAddressLine2),
+    sellerCity: orNull(data.sellerCity),
+    sellerPincode: orNull(data.sellerPincode),
+    sellerPhone: orNull(data.sellerPhone),
+    sellerEmail: orNull(data.sellerEmail),
+    pricingMode: data.pricingMode,
+    defaultHsnId: data.defaultHsnId || null,
+  };
+}
 
 export const categoryHsnMappingSchema = z.object({
   categoryId: z.string().min(1, "Category ID is required"),
@@ -195,6 +240,6 @@ export const taxPreviewInputSchema = z.object({
 export type UnitInput = z.infer<typeof unitInputSchema>;
 export type HsnInput = z.infer<typeof hsnInputSchema>;
 export type RateVersionInput = z.infer<typeof rateVersionInputSchema>;
-export type TaxSettingsInput = z.infer<typeof taxSettingsInputSchema>;
+export type TaxSettingsInput = z.input<typeof taxSettingsInputSchema>;
 export type CategoryHsnMappingInput = z.infer<typeof categoryHsnMappingSchema>;
 export type TaxPreviewInput = z.infer<typeof taxPreviewInputSchema>;

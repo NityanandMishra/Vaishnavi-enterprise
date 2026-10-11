@@ -7,7 +7,7 @@ import {
   HsnInput,
   rateVersionInputSchema,
   RateVersionInput,
-  taxSettingsInputSchema,
+  taxSettingsInputSchema, taxSettingsUpdateData,
   TaxSettingsInput,
   categoryHsnMappingSchema,
   bulkCategoryHsnSchema,
@@ -577,8 +577,7 @@ export async function getTaxSettingsAction() {
   if (!settings) {
     settings = await prisma.taxSettings.create({
       data: {
-        sellerStateCode: "27",
-        sellerGstin: "27AABCV1234K1Z5",
+        // Seller identity starts empty; it must be entered in Tax Settings before invoicing.
         pricingMode: "EXCLUSIVE",
       },
       include: {
@@ -615,8 +614,7 @@ export async function updateTaxSettingsAction(raw: TaxSettingsInput) {
   if (!settings) {
     settings = await prisma.taxSettings.create({
       data: {
-        sellerStateCode: "27",
-        sellerGstin: "27AABCV1234K1Z5",
+        // Seller identity starts empty; it must be entered in Tax Settings before invoicing.
         pricingMode: "EXCLUSIVE",
       },
     });
@@ -639,12 +637,7 @@ export async function updateTaxSettingsAction(raw: TaxSettingsInput) {
 
   const updated = await prisma.taxSettings.update({
     where: { id: settings.id },
-    data: {
-      sellerStateCode: data.sellerStateCode,
-      sellerGstin: data.sellerGstin,
-      pricingMode: data.pricingMode,
-      defaultHsnId: data.defaultHsnId || null,
-    },
+    data: taxSettingsUpdateData(data),
     include: {
       defaultHsn: {
         select: { id: true, code: true, description: true, rateType: true },

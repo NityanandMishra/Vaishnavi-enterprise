@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { getSellerIdentity } from "@/lib/tax/seller";
+import { getStateCodeByName, getStateNameByCode } from "@/lib/tax/indian-states";
 
 /**
  * Returns Indian Financial Year string (e.g. "26-27" or "2026-27").
@@ -222,9 +224,8 @@ export async function generateOrderInvoice(orderId: string, actor: string = "Sys
     throw new Error(`Order #${orderId} not found`);
   }
 
-  const taxSettings = await prisma.taxSettings.findFirst();
-  const sellerStateCode = taxSettings?.sellerStateCode || "27";
-  const sellerGstin = taxSettings?.sellerGstin || "27AABCV1234K1Z5";
+  // Throws SellerNotConfiguredError (listing what is missing) instead of falling back
+  const seller = await getSellerIdentity();
 
   let shippingAddr: any = {};
   try {
@@ -233,8 +234,11 @@ export async function generateOrderInvoice(orderId: string, actor: string = "Sys
     shippingAddr = {};
   }
 
-  const deliveryStateCode = order.deliveryStateCode || "27";
-  const isInterState = deliveryStateCode !== sellerStateCode;
+  const deliveryStateCode =
+    order.deliveryStateCode || (shippingAddr.state ? getStateCodeByName(shippingAddr.state, "") : "");
+  if (!deliveryStateCode) {
+    throw new Error(`Order ${order.orderNumber || orderId} has no delivery state, so the GST type cannot be determined`);
+  }
 
   const fy = getCurrentFinancialYear(order.placedAt || new Date());
   const financialYearStr = fy.full;
@@ -282,6 +286,15 @@ export async function generateOrderInvoice(orderId: string, actor: string = "Sys
     const cessTotal = invoiceLines.reduce((s, i) => s + i.cessAmount, 0);
     const taxTotal = cgstTotal + sgstTotal + igstTotal + cessTotal;
 
+    // The invoice must state the tax actually charged on the order lines.
+    const isInterState =
+      igstTotal > 0 || (cgstTotal + sgstTotal === 0 && deliveryStateCode !== seller.stateCode);
+    if (isInterState !== (deliveryStateCode !== seller.stateCode)) {
+      console.warn(
+        `Invoice for order ${order.orderNumber || orderId}: charged ${isInterState ? "IGST" : "CGST+SGST"} but seller state ${seller.stateCode} vs delivery ${deliveryStateCode} implies otherwise`
+      );
+    }
+
     const grandTotal = order.totalAmount;
     const totalInWords = numberToIndianWords(grandTotal);
 
@@ -291,25 +304,14 @@ export async function generateOrderInvoice(orderId: string, actor: string = "Sys
       sequenceNumber: nextSeq,
       date: new Date().toISOString(),
       orderNumber: order.orderNumber || order.id,
-      seller: {
-        name: "Vaishnavi Enterprises",
-        tradeName: "Vaishnavi Electricals & Hardware",
-        address: "Shop No. 4, Commercial Complex, MG Road",
-        city: "Mumbai",
-        state: "Maharashtra",
-        stateCode: sellerStateCode,
-        pincode: "400001",
-        gstin: sellerGstin,
-        email: "sales@vaishnavienterprises.in",
-        phone: "+91 98200 12345",
-      },
+      seller,
       buyer: {
         name: order.customerName || shippingAddr.fullName || order.user?.name || "Customer",
         phone: order.customerPhone || shippingAddr.phone || order.user?.phone || "",
         email: order.customerEmail || order.user?.email,
         shippingAddress: shippingAddr,
         deliveryStateCode,
-        deliveryState: shippingAddr.state || "Maharashtra",
+        deliveryState: shippingAddr.state || getStateNameByCode(deliveryStateCode),
         gstin: null,
       },
       items: invoiceLines,
