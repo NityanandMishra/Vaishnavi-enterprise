@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSellerIdentity } from "@/lib/tax/seller";
 import { getStateCodeByName, getStateNameByCode } from "@/lib/tax/indian-states";
@@ -190,25 +191,56 @@ export interface InvoiceDataPayload {
   isInterState: boolean;
 }
 
+type Tx = Prisma.TransactionClient;
+
+function parseAddress(raw: unknown): any {
+  try {
+    return typeof raw === "string" ? JSON.parse(raw) : raw || {};
+  } catch {
+    return {};
+  }
+}
+
+/** GST state code of the delivery address, or throws: the invoice's tax type depends on it. */
+function resolveDeliveryStateCode(
+  order: { id: string; orderNumber: string | null; deliveryStateCode: string | null },
+  shippingAddr: any
+): string {
+  const code =
+    order.deliveryStateCode || (shippingAddr?.state ? getStateCodeByName(shippingAddr.state, "") : "");
+  if (!code) {
+    throw new Error(`Order ${order.orderNumber || order.id} has no delivery state, so the GST type cannot be determined`);
+  }
+  return code;
+}
+
+/**
+ * Throws if an invoice could not be issued for this order (incomplete seller details in
+ * Tax Settings, or no delivery state). Dispatch paths call this before changing anything,
+ * so a failed invoice never leaves stock consumed on an unshipped order.
+ */
+export async function assertOrderCanBeInvoiced(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, orderNumber: true, deliveryStateCode: true, shippingAddress: true, invoice: { select: { id: true } } },
+  });
+  if (!order) throw new Error(`Order #${orderId} not found`);
+  if (order.invoice) return;
+  await getSellerIdentity();
+  resolveDeliveryStateCode(order, parseAddress(order.shippingAddress));
+}
+
 /**
  * ORD-11 / FR-18 / FR-19 / FR-20:
- * Generates an immutable, gapless sequential GST tax invoice for an order.
- * If invoice already exists for the order, returns existing record.
+ * Issues the immutable, gapless sequential GST tax invoice for an order inside the
+ * caller's transaction. Idempotent: returns the existing invoice if there is one.
+ * Called by the SHIPPED transition (order-service), so every dispatch path invoices once.
  */
-export async function generateOrderInvoice(orderId: string, actor: string = "System") {
-  // Check if invoice already exists (immutable)
-  const existing = await prisma.invoice.findUnique({
-    where: { orderId },
-  });
-  if (existing) {
-    return {
-      success: true,
-      invoice: existing,
-      alreadyExisted: true,
-    };
-  }
+export async function createOrderInvoice(tx: Tx, orderId: string, actor: string = "System") {
+  const existing = await tx.invoice.findUnique({ where: { orderId } });
+  if (existing) return { success: true, invoice: existing, alreadyExisted: true };
 
-  const order = await prisma.order.findUnique({
+  const order = await tx.order.findUnique({
     where: { id: orderId },
     include: {
       items: {
@@ -225,136 +257,125 @@ export async function generateOrderInvoice(orderId: string, actor: string = "Sys
   }
 
   // Throws SellerNotConfiguredError (listing what is missing) instead of falling back
-  const seller = await getSellerIdentity();
+  const seller = await getSellerIdentity(tx);
 
-  let shippingAddr: any = {};
-  try {
-    shippingAddr = typeof order.shippingAddress === "string" ? JSON.parse(order.shippingAddress) : order.shippingAddress;
-  } catch (e) {
-    shippingAddr = {};
-  }
-
-  const deliveryStateCode =
-    order.deliveryStateCode || (shippingAddr.state ? getStateCodeByName(shippingAddr.state, "") : "");
-  if (!deliveryStateCode) {
-    throw new Error(`Order ${order.orderNumber || orderId} has no delivery state, so the GST type cannot be determined`);
-  }
+  const shippingAddr = parseAddress(order.shippingAddress);
+  const deliveryStateCode = resolveDeliveryStateCode(order, shippingAddr);
 
   const fy = getCurrentFinancialYear(order.placedAt || new Date());
   const financialYearStr = fy.full;
 
-  return await prisma.$transaction(async (tx) => {
-    // Re-check in transaction to prevent race conditions
-    const doubleCheck = await tx.invoice.findUnique({ where: { orderId } });
-    if (doubleCheck) return { success: true, invoice: doubleCheck, alreadyExisted: true };
+  // Find highest sequenceNumber in this financial year
+  const lastInvoice = await tx.invoice.findFirst({
+    where: { financialYear: financialYearStr },
+    orderBy: { sequenceNumber: "desc" },
+  });
 
-    // Find highest sequenceNumber in this financial year
-    const lastInvoice = await tx.invoice.findFirst({
-      where: { financialYear: financialYearStr },
-      orderBy: { sequenceNumber: "desc" },
-    });
+  const nextSeq = (lastInvoice?.sequenceNumber || 0) + 1;
+  const paddedSeq = String(nextSeq).padStart(4, "0");
+  const invoiceNumber = `VE/${fy.short}/${paddedSeq}`;
 
-    const nextSeq = (lastInvoice?.sequenceNumber || 0) + 1;
-    const paddedSeq = String(nextSeq).padStart(4, "0");
-    const invoiceNumber = `VE/${fy.short}/${paddedSeq}`;
+  // Map active lines with snapshot values (FI-01)
+  const invoiceLines: InvoiceLineItem[] = order.items.map((item) => {
+    return {
+      id: item.id,
+      productName: item.productName || "Product",
+      variantTitle: item.variantTitle,
+      sku: item.sku || "SKU",
+      quantity: item.quantity - (item.cancelledQty || 0),
+      unitPrice: item.price,
+      taxableValue: item.taxableValue || item.price * (item.quantity - (item.cancelledQty || 0)),
+      hsnCode: item.hsnCode || "8536",
+      gstRate: item.gstRate || 18,
+      cgstAmount: item.cgstAmount || 0,
+      sgstAmount: item.sgstAmount || 0,
+      igstAmount: item.igstAmount || 0,
+      cessAmount: item.cessAmount || 0,
+      lineTotal: item.lineTotal || (item.price * item.quantity),
+    };
+  });
 
-    // Map active lines with snapshot values (FI-01)
-    const invoiceLines: InvoiceLineItem[] = order.items.map((item) => {
-      return {
-        id: item.id,
-        productName: item.productName || "Product",
-        variantTitle: item.variantTitle,
-        sku: item.sku || "SKU",
-        quantity: item.quantity - (item.cancelledQty || 0),
-        unitPrice: item.price,
-        taxableValue: item.taxableValue || item.price * (item.quantity - (item.cancelledQty || 0)),
-        hsnCode: item.hsnCode || "8536",
-        gstRate: item.gstRate || 18,
-        cgstAmount: item.cgstAmount || 0,
-        sgstAmount: item.sgstAmount || 0,
-        igstAmount: item.igstAmount || 0,
-        cessAmount: item.cessAmount || 0,
-        lineTotal: item.lineTotal || (item.price * item.quantity),
-      };
-    });
+  const subtotal = invoiceLines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const taxableTotal = invoiceLines.reduce((s, i) => s + i.taxableValue, 0);
+  const cgstTotal = invoiceLines.reduce((s, i) => s + i.cgstAmount, 0);
+  const sgstTotal = invoiceLines.reduce((s, i) => s + i.sgstAmount, 0);
+  const igstTotal = invoiceLines.reduce((s, i) => s + i.igstAmount, 0);
+  const cessTotal = invoiceLines.reduce((s, i) => s + i.cessAmount, 0);
+  const taxTotal = cgstTotal + sgstTotal + igstTotal + cessTotal;
 
-    const subtotal = invoiceLines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-    const taxableTotal = invoiceLines.reduce((s, i) => s + i.taxableValue, 0);
-    const cgstTotal = invoiceLines.reduce((s, i) => s + i.cgstAmount, 0);
-    const sgstTotal = invoiceLines.reduce((s, i) => s + i.sgstAmount, 0);
-    const igstTotal = invoiceLines.reduce((s, i) => s + i.igstAmount, 0);
-    const cessTotal = invoiceLines.reduce((s, i) => s + i.cessAmount, 0);
-    const taxTotal = cgstTotal + sgstTotal + igstTotal + cessTotal;
+  // The invoice must state the tax actually charged on the order lines.
+  const isInterState =
+    igstTotal > 0 || (cgstTotal + sgstTotal === 0 && deliveryStateCode !== seller.stateCode);
+  if (isInterState !== (deliveryStateCode !== seller.stateCode)) {
+    console.warn(
+      `Invoice for order ${order.orderNumber || orderId}: charged ${isInterState ? "IGST" : "CGST+SGST"} but seller state ${seller.stateCode} vs delivery ${deliveryStateCode} implies otherwise`
+    );
+  }
 
-    // The invoice must state the tax actually charged on the order lines.
-    const isInterState =
-      igstTotal > 0 || (cgstTotal + sgstTotal === 0 && deliveryStateCode !== seller.stateCode);
-    if (isInterState !== (deliveryStateCode !== seller.stateCode)) {
-      console.warn(
-        `Invoice for order ${order.orderNumber || orderId}: charged ${isInterState ? "IGST" : "CGST+SGST"} but seller state ${seller.stateCode} vs delivery ${deliveryStateCode} implies otherwise`
-      );
-    }
+  const grandTotal = order.totalAmount;
+  const totalInWords = numberToIndianWords(grandTotal);
 
-    const grandTotal = order.totalAmount;
-    const totalInWords = numberToIndianWords(grandTotal);
+  const payload: InvoiceDataPayload = {
+    invoiceNumber,
+    financialYear: financialYearStr,
+    sequenceNumber: nextSeq,
+    date: new Date().toISOString(),
+    orderNumber: order.orderNumber || order.id,
+    seller,
+    buyer: {
+      name: order.customerName || shippingAddr.fullName || order.user?.name || "Customer",
+      phone: order.customerPhone || shippingAddr.phone || order.user?.phone || "",
+      email: order.customerEmail || order.user?.email,
+      shippingAddress: shippingAddr,
+      deliveryStateCode,
+      deliveryState: shippingAddr.state || getStateNameByCode(deliveryStateCode),
+      gstin: null,
+    },
+    items: invoiceLines,
+    subtotal,
+    discount: order.discountAmount,
+    taxableValue: taxableTotal,
+    cgstTotal,
+    sgstTotal,
+    igstTotal,
+    cessTotal,
+    shipping: order.shippingCost,
+    total: grandTotal,
+    totalInWords,
+    isInterState,
+  };
 
-    const payload: InvoiceDataPayload = {
+  const invoice = await tx.invoice.create({
+    data: {
+      orderId,
       invoiceNumber,
       financialYear: financialYearStr,
       sequenceNumber: nextSeq,
-      date: new Date().toISOString(),
-      orderNumber: order.orderNumber || order.id,
-      seller,
-      buyer: {
-        name: order.customerName || shippingAddr.fullName || order.user?.name || "Customer",
-        phone: order.customerPhone || shippingAddr.phone || order.user?.phone || "",
-        email: order.customerEmail || order.user?.email,
-        shippingAddress: shippingAddr,
-        deliveryStateCode,
-        deliveryState: shippingAddr.state || getStateNameByCode(deliveryStateCode),
-        gstin: null,
-      },
-      items: invoiceLines,
-      subtotal,
-      discount: order.discountAmount,
-      taxableValue: taxableTotal,
-      cgstTotal,
-      sgstTotal,
-      igstTotal,
-      cessTotal,
-      shipping: order.shippingCost,
-      total: grandTotal,
-      totalInWords,
-      isInterState,
-    };
-
-    const invoice = await tx.invoice.create({
-      data: {
-        orderId,
-        invoiceNumber,
-        financialYear: financialYearStr,
-        sequenceNumber: nextSeq,
-        totalAmount: grandTotal,
-        taxAmount: taxTotal,
-        invoiceData: JSON.stringify(payload),
-      },
-    });
-
-    // Record timeline entry (ORD-09)
-    await tx.orderStatusHistory.create({
-      data: {
-        orderId,
-        toStatus: order.status,
-        reason: "Invoice generated",
-        note: `Tax invoice ${invoiceNumber} issued for ${totalInWords}`,
-        createdBy: actor,
-      },
-    });
-
-    return {
-      success: true,
-      invoice,
-      alreadyExisted: false,
-    };
+      totalAmount: grandTotal,
+      taxAmount: taxTotal,
+      invoiceData: JSON.stringify(payload),
+    },
   });
+
+  // Record timeline entry (ORD-09)
+  await tx.orderStatusHistory.create({
+    data: {
+      orderId,
+      toStatus: order.status,
+      reason: "Invoice generated",
+      note: `Tax invoice ${invoiceNumber} issued for ${totalInWords}`,
+      createdBy: actor,
+    },
+  });
+
+  return {
+    success: true,
+    invoice,
+    alreadyExisted: false,
+  };
+}
+
+/** Issues the invoice in its own transaction (admin "Generate invoice" action). */
+export async function generateOrderInvoice(orderId: string, actor: string = "System") {
+  return await prisma.$transaction((tx) => createOrderInvoice(tx, orderId, actor));
 }

@@ -82,6 +82,11 @@ export async function getOrderDetails(id: string) {
 export async function updateOrderStatus(id: string, status: string) {
   try {
     await requireRole(ORDER_WRITE_ROLES);
+    // This legacy action writes the status directly; SHIPPED must go through dispatch,
+    // whose shared transition issues the GST invoice (ORD-11).
+    if (status === "SHIPPED") {
+      return { success: false, error: "Orders move to SHIPPED only through dispatch, which issues the GST invoice." };
+    }
     const currentOrder = await prisma.order.findUnique({
       where: { id },
       include: { items: true },
