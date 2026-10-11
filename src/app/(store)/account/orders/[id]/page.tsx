@@ -481,15 +481,22 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               </div>
             </dl>
 
-            {/* Download Tax Invoice CTA Button */}
+            {/* Tax invoice: issued when the order ships */}
             <div className="mt-5 pt-4 border-t border-border-base flex flex-col sm:flex-row items-center gap-3">
-              <Link
-                href={`/account/orders/${order.id}/invoice`}
-                className="w-full sm:flex-1 min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-xs"
-              >
-                <FileText size={16} />
-                <span>View & Print Official GST Invoice</span>
-              </Link>
+              {order.invoice ? (
+                <Link
+                  href={`/account/orders/${order.id}/invoice`}
+                  className="w-full sm:flex-1 min-h-[44px] flex items-center justify-center gap-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-xs"
+                >
+                  <FileText size={16} />
+                  <span>View & Print GST Invoice</span>
+                </Link>
+              ) : (
+                <p className="w-full text-xs text-slate-600 flex items-center gap-2">
+                  <FileText size={14} className="text-slate-400" />
+                  Your GST tax invoice will be available once your order ships.
+                </p>
+              )}
             </div>
           </div>
 

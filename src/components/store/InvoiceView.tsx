@@ -24,6 +24,7 @@ export interface InvoiceItem {
 export interface InvoiceData {
   invoiceNumber: string;
   orderId: string;
+  orderNumber?: string | null;
   orderDate: Date | string;
   paymentMethod: string;
   paymentStatus: string;
@@ -205,7 +206,7 @@ export default function InvoiceView({
               <strong>Invoice Date:</strong> {formattedDate}
             </p>
             <p className="text-xs text-slate-500 mt-0.5">
-              <strong>Order ID:</strong> #{invoice.orderId.slice(0, 8).toUpperCase()}
+              <strong>Order ID:</strong> #{invoice.orderNumber || invoice.orderId.slice(0, 8).toUpperCase()}
             </p>
           </div>
         </div>

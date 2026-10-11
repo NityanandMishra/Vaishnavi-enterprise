@@ -365,13 +365,16 @@ export default async function AccountPage({
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <Link
-                                href={`/account/orders/${order.id}/invoice`}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50 transition-colors"
-                              >
-                                <FileText size={13} />
-                                <span>GST Invoice</span>
-                              </Link>
+                              {/* Only orders that have shipped have an issued invoice */}
+                              {order.invoice && (
+                                <Link
+                                  href={`/account/orders/${order.id}/invoice`}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50 transition-colors"
+                                >
+                                  <FileText size={13} />
+                                  <span>GST Invoice</span>
+                                </Link>
+                              )}
 
                               <Link
                                 href={`/account/orders/${order.id}`}

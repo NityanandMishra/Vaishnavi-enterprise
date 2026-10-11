@@ -1,14 +1,30 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
+import { FileText } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { authOptions } from "@/lib/nextauth";
 import InvoiceView, { InvoiceData } from "@/components/store/InvoiceView";
+import type { InvoiceDataPayload } from "@/lib/orders/invoice-generator";
 
 export const metadata: Metadata = {
   title: "Tax Invoice",
 };
 
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PAID: "Paid",
+  PARTIALLY_PAID: "Partially paid",
+  PENDING: "Pending",
+  REFUNDED: "Refunded",
+  PARTIALLY_REFUNDED: "Partially refunded",
+  FAILED: "Failed",
+};
+
+/**
+ * Shows the stored GST invoice exactly as issued when the order shipped (ORD-11).
+ * Nothing is recomputed here: no invoice row means no invoice yet.
+ */
 export default async function CustomerOrderInvoicePage({
   params,
 }: {
@@ -18,99 +34,102 @@ export default async function CustomerOrderInvoicePage({
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) redirect(`/auth/login?callbackUrl=/account/orders/${params.id}/invoice`);
 
-  const [order, taxSettings] = await Promise.all([
-    prisma.order.findUnique({
-      where: { id: params.id },
-      include: {
-        user: true,
-        invoice: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                category: true,
-              },
-            },
-            variant: true,
-          },
-        },
-      },
-    }),
-    prisma.taxSettings.findFirst(),
-  ]);
+  const order = await prisma.order.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true,
+      userId: true,
+      orderNumber: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      couponCode: true,
+      razorpayPaymentId: true,
+      invoice: { select: { invoiceData: true } },
+    },
+  });
 
   if (!order || order.userId !== userId) {
     notFound();
   }
 
-  let address: Record<string, any> = {};
-  try {
-    address = JSON.parse(order.shippingAddress);
-  } catch (_) {}
+  const backHref = `/account/orders/${order.id}`;
 
-  const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const totalCgst = order.items.reduce((sum, item) => sum + (item.cgstAmount ?? 0), 0);
-  const totalSgst = order.items.reduce((sum, item) => sum + (item.sgstAmount ?? 0), 0);
-  const totalIgst = order.items.reduce((sum, item) => sum + (item.igstAmount ?? 0), 0);
-  const totalCess = order.items.reduce((sum, item) => sum + (item.cessAmount ?? 0), 0);
-  const totalSnapshotTax = totalCgst + totalSgst + totalIgst + totalCess;
-  const gstAmount = totalSnapshotTax > 0 ? totalSnapshotTax : Math.round(subtotal * 0.18);
+  if (!order.invoice) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center">
+        <FileText size={40} className="mx-auto text-slate-400" />
+        <h1 className="mt-4 text-xl font-bold text-slate-900">Invoice not available yet</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Your GST tax invoice will be available once your order ships.
+        </p>
+        <Link
+          href={backHref}
+          className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          Back to order
+        </Link>
+      </div>
+    );
+  }
+
+  const issued = JSON.parse(order.invoice.invoiceData) as InvoiceDataPayload;
+  const address = issued.buyer.shippingAddress || {};
 
   const invoiceData: InvoiceData = {
-    invoiceNumber:
-      order.invoice?.invoiceNumber ||
-      `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
+    invoiceNumber: issued.invoiceNumber,
     orderId: order.id,
-    orderDate: order.createdAt,
-    paymentMethod: order.paymentMethod === "COD" ? "Cash on Delivery" : "Online / UPI (Razorpay)",
-    paymentStatus: order.status === "PENDING" ? "Pending" : "Confirmed / Paid",
-    transactionId: order.razorpayPaymentId || order.razorpayOrderId || null,
+    orderNumber: issued.orderNumber,
+    orderDate: issued.date, // shown as the invoice date
+    paymentMethod: order.paymentMethod === "COD" ? "Cash on Delivery" : "Online payment",
+    paymentStatus: PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus,
+    transactionId: order.razorpayPaymentId || null,
     seller: {
-      name: "Vaishnavi Enterprises",
-      tradeName: "Vaishnavi Enterprises (Solar & Electrical Goods)",
-      address: "Main Market, Suriyawan Road",
-      city: "Suriyawan, Bhadohi",
-      state: taxSettings?.sellerStateCode === "09" ? "Uttar Pradesh" : "Maharashtra",
-      pincode: "221404",
-      gstin: taxSettings?.sellerGstin || "09AAEPV1234F1Z5",
-      phone: "+91 73888 47575",
-      email: "info@vaishnavienterprises.in",
+      name: issued.seller.name,
+      tradeName: issued.seller.tradeName || "",
+      address: issued.seller.address,
+      city: issued.seller.city,
+      state: issued.seller.state,
+      pincode: issued.seller.pincode,
+      gstin: issued.seller.gstin,
+      phone: issued.seller.phone,
+      email: issued.seller.email,
     },
     buyer: {
-      name: address.fullName || order.user?.name || "Customer",
-      phone: address.phone || address.alternatePhone || order.user?.phone || undefined,
-      email: order.user?.email || undefined,
-      addressLine1: address.addressLine1 || "Local Address",
+      name: issued.buyer.name,
+      phone: issued.buyer.phone || undefined,
+      email: issued.buyer.email || undefined,
+      addressLine1: address.addressLine1 || "",
       addressLine2: address.addressLine2 || null,
-      city: address.city || "Suriyawan",
-      state: address.state || "Uttar Pradesh",
-      pincode: address.pincode || "221404",
+      city: address.city || "",
+      state: issued.buyer.deliveryState,
+      pincode: address.pincode || "",
     },
-    items: order.items.map((item) => ({
+    items: issued.items.map((item) => ({
       id: item.id,
-      title: item.product.title,
-      variantTitle: item.variantTitle || item.variant?.title || null,
-      hsnCode: item.hsnCode || item.product.hsnCode || item.product.category?.hsnCode || "8536",
+      title: item.productName,
+      variantTitle: item.variantTitle,
+      hsnCode: item.hsnCode,
       quantity: item.quantity,
-      price: item.price,
-      taxableValue: item.taxableValue ?? undefined,
-      gstRate: item.gstRate ?? undefined,
-      cgstAmount: item.cgstAmount ?? undefined,
-      sgstAmount: item.sgstAmount ?? undefined,
-      igstAmount: item.igstAmount ?? undefined,
-      cessAmount: item.cessAmount ?? undefined,
+      price: item.unitPrice,
+      taxableValue: item.taxableValue,
+      gstRate: item.gstRate,
+      cgstAmount: item.cgstAmount,
+      sgstAmount: item.sgstAmount,
+      igstAmount: item.igstAmount,
+      cessAmount: item.cessAmount,
     })),
-    subtotal,
-    discountAmount: order.discountAmount || 0,
+    subtotal: issued.subtotal,
+    discountAmount: issued.discount || 0,
     couponCode: order.couponCode,
-    shippingCost: order.shippingCost || 0,
-    gstAmount,
-    totalAmount: order.totalAmount,
-    cgstTotal: totalCgst,
-    sgstTotal: totalSgst,
-    igstTotal: totalIgst,
-    cessTotal: totalCess,
+    shippingCost: issued.shipping || 0,
+    gstAmount: issued.cgstTotal + issued.sgstTotal + issued.igstTotal + issued.cessTotal,
+    totalAmount: issued.total,
+    cgstTotal: issued.cgstTotal,
+    sgstTotal: issued.sgstTotal,
+    igstTotal: issued.igstTotal,
+    cessTotal: issued.cessTotal,
+    taxableValueTotal: issued.taxableValue,
   };
 
-  return <InvoiceView invoice={invoiceData} backHref={`/account/orders/${order.id}`} />;
+  return <InvoiceView invoice={invoiceData} backHref={backHref} />;
 }
