@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardApiRole, ORDER_READ_ROLES, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
+import { assertOrderCanBeInvoiced } from "@/lib/orders/invoice-generator";
 import {
   createShipment,
   dispatchShipment,
@@ -177,6 +178,12 @@ export async function POST(req: NextRequest) {
         { error: "orderId, courierId, and non-empty lines array are required" },
         { status: 400 }
       );
+    }
+
+    // Create & Dispatch: refuse before creating anything if the order could not be invoiced,
+    // so a failed attempt does not leave a PENDING shipment holding the items.
+    if (dispatchImmediately) {
+      await assertOrderCanBeInvoiced(orderId);
     }
 
     const shipment = await createShipment({

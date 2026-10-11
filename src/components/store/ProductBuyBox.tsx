@@ -66,6 +66,22 @@ interface ProductBuyBoxProps {
   sourcingLeadDays?: number | null;
 }
 
+/** The label a variant has for one selector group: its attribute value, or the
+ *  matching part of a "1200 mm / Pearl White" title for title-derived groups. */
+function variantLabelFor(v: BuyBoxVariant, groupCode: string): string | undefined {
+  const vav = v.variantAttributeValues?.find((x) => x.attribute.code === groupCode);
+  if (vav) return vav.attributeValue.label;
+  const titlePart = /^attr_(\d+)$/.exec(groupCode);
+  if (titlePart) return v.title.split("/")[Number(titlePart[1])]?.trim();
+  if (groupCode === "default") return v.title;
+  return undefined;
+}
+
+/** Exact match on every chosen option; never a partial or substring match. */
+function matchesChoices(v: BuyBoxVariant, choices: Record<string, string>) {
+  return Object.entries(choices).every(([code, label]) => variantLabelFor(v, code) === label);
+}
+
 export default function ProductBuyBox({
   productId,
   productTitle,
@@ -181,33 +197,17 @@ export default function ProductBuyBox({
     return init;
   });
 
-  // Resolve matching variant from choices
+  // Resolve the variant for the chosen options. A combination that does not exist
+  // resolves to null (never to another variant), so it cannot be priced or bought (§5.3).
   const currentVariant = useMemo(() => {
     if (variants.length <= 1) return variants[0] || null;
+    return variants.find((v) => matchesChoices(v, selectedChoices)) || null;
+  }, [variants, selectedChoices]);
+  const isUnavailableCombo = variants.length > 1 && !currentVariant;
 
-    if (attributeGroups.length > 0) {
-      // Find variant whose title or DB attributes match all selected choices
-      const match = variants.find((v) => {
-        // If DB relations present
-        if (v.variantAttributeValues && v.variantAttributeValues.length > 0) {
-          return Object.entries(selectedChoices).every(([attrCode, label]) => {
-            return v.variantAttributeValues?.some(
-              (vav) => vav.attribute.code === attrCode && vav.attributeValue.label === label
-            );
-          });
-        }
-
-        // Title match
-        return Object.values(selectedChoices).every((choiceLabel) =>
-          v.title.toLowerCase().includes(choiceLabel.toLowerCase())
-        );
-      });
-
-      if (match) return match;
-    }
-
-    return variants[0] || null;
-  }, [variants, attributeGroups, selectedChoices]);
+  // Whether picking this option, keeping the other choices, gives a real variant
+  const isOptionAvailable = (groupCode: string, label: string) =>
+    variants.some((v) => matchesChoices(v, { ...selectedChoices, [groupCode]: label }));
 
   // Pricing calculations
   const price = currentVariant?.price ?? basePrice;
@@ -220,6 +220,8 @@ export default function ProductBuyBox({
   const tracked = stockMode === "TRACKED";
   const stockQty = currentVariant?.stock ?? 0;
   const isOutOfStock = !isAvailable || (tracked && stockQty <= 0);
+  const canBuy = !isUnavailableCombo;
+  const comboLabel = Object.values(selectedChoices).join(" / ");
   const isLowStock = tracked && stockQty > 0 && stockQty <= 3;
 
   // Quantity stepper
@@ -348,6 +350,7 @@ export default function ProductBuyBox({
                 <div className="var-chips">
                   {group.options.map((opt) => {
                     const isSelected = currentChoice === opt.label;
+                    const available = isOptionAvailable(group.code, opt.label);
                     return (
                       <button
                         key={opt.code}
@@ -355,9 +358,11 @@ export default function ProductBuyBox({
                         onClick={() => handleSelectChoice(group.code, opt.label)}
                         className={cn(
                           "var-chip",
-                          isSelected && "is-selected"
+                          isSelected && "is-selected",
+                          !available && "is-unavailable"
                         )}
                         aria-pressed={isSelected}
+                        aria-label={available ? undefined : `${opt.label} (not available with your other choices)`}
                       >
                         {group.usesSwatches && opt.swatchHex && (
                           <span
@@ -405,7 +410,28 @@ export default function ProductBuyBox({
 
       {/* ── Honest Availability Badge (§5.3 & Principle P-05) ───────────── */}
       <div className="p-3.5 rounded bg-[var(--mortar)] border border-[var(--line)] text-sm flex items-center gap-3">
-        {isOutOfStock ? (
+        {isUnavailableCombo ? (
+          <>
+            <AlertCircle size={18} className="text-[var(--ask)] flex-shrink-0" />
+            <div>
+              <span className="font-bold text-[var(--ask)] block">
+                {comboLabel} is not a stocked combination
+              </span>
+              <span className="text-xs text-[var(--fg-muted)]">
+                Pick another option, or{" "}
+                <a
+                  href={ownerWhatsAppUrl(`Hello Vaishnavi Enterprises, can you arrange ${productTitle} in ${comboLabel}?`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-semibold"
+                >
+                  ask us to arrange it
+                </a>
+                .
+              </span>
+            </div>
+          </>
+        ) : isOutOfStock ? (
           <>
             <Clock size={18} className="text-[var(--ask)] flex-shrink-0" />
             <div>
@@ -515,7 +541,7 @@ export default function ProductBuyBox({
         <div className="flex gap-3 w-full">
           <button
             onClick={() => handleAdd(false)}
-            disabled={isPending}
+            disabled={isPending || !canBuy}
             className="act act-line flex-1 act-big"
           >
             <ShoppingCart size={18} />
@@ -523,7 +549,7 @@ export default function ProductBuyBox({
           </button>
           <button
             onClick={() => handleAdd(true)}
-            disabled={isPending}
+            disabled={isPending || !canBuy}
             className="act act-fill flex-1 act-big"
           >
             <Zap size={18} className="fill-white" />
@@ -556,7 +582,7 @@ export default function ProductBuyBox({
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleAdd(false)}
-            disabled={isPending}
+            disabled={isPending || !canBuy}
             className="act act-line px-3 text-xs"
           >
             <ShoppingCart size={16} />
@@ -564,7 +590,7 @@ export default function ProductBuyBox({
           </button>
           <button
             onClick={() => handleAdd(true)}
-            disabled={isPending}
+            disabled={isPending || !canBuy}
             className="act act-fill px-4 text-xs"
           >
             <Zap size={16} className="fill-white" />

@@ -230,6 +230,7 @@ export function evaluatePublishGate(
     brandId?: string | null;
     unit?: string | null;
     hsnCode?: string | null;
+    checkoutMode?: string | null;
     metaDescription?: string | null;
     images?: Array<{ imageId?: string; altText?: string | null }>;
     variants?: Array<{
@@ -333,18 +334,23 @@ export function evaluatePublishGate(
     anchor: "#section-variants",
   });
 
-  // 8. Variant Pricing Check (Every active variant must have selling price > 0, price <= mrp)
+  // 8. Variant Pricing Check (Every active variant must have selling price > 0, price <= mrp).
+  // INQUIRE products are priced on request (spec 10), so only they may be unpriced;
+  // a price that is entered must still not exceed MRP.
+  const isInquire = product.checkoutMode === "INQUIRE";
   let unpricedCount = 0;
   let invalidMrpCount = 0;
   for (const v of activeVariants) {
     const p = v.price ? Number(v.price) : 0;
     const m = v.mrp ? Number(v.mrp) : 0;
-    if (p <= 0) unpricedCount++;
+    if (p <= 0 && !isInquire) unpricedCount++;
     if (m > 0 && p > m) invalidMrpCount++;
   }
 
   const pricingPassed = hasActiveVariants && unpricedCount === 0 && invalidMrpCount === 0;
-  let pricingMsg = "All active variants have valid prices";
+  let pricingMsg = isInquire
+    ? "Price on request (INQUIRE): a selling price is optional"
+    : "All active variants have valid prices";
   if (unpricedCount > 0) {
     pricingMsg = `${unpricedCount} active variant${unpricedCount > 1 ? "s have" : " has"} no selling price (must be > ₹0)`;
   } else if (invalidMrpCount > 0) {

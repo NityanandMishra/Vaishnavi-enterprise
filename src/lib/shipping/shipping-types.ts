@@ -61,6 +61,7 @@ export interface CourierOption {
   courierId: string;
   courierName: string;
   courierCode: string;
+  integrationMode: string; // "API" | "MANUAL" (MANUAL needs an AWB at dispatch)
   costPaise: number; // Our internal cost
   transitDays: number;
   isServiceable: boolean;

@@ -76,14 +76,34 @@ export async function addToCart(input: {
   const parsed = addToCartSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Invalid request." };
 
-  const { productId, variantId, quantity } = parsed.data;
+  const { productId, quantity } = parsed.data;
 
-  const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product || !product.isAvailable) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: {
+      variants: {
+        where: { deletedAt: null, isActive: true, isAvailable: true },
+        select: { id: true },
+      },
+    },
+  });
+  if (!product || !product.isAvailable || product.status !== "ACTIVE" || product.deletedAt) {
     return { ok: false as const, error: "This product is not available." };
   }
   if (product.checkoutMode === "INQUIRE") {
     return { ok: false as const, error: "This product is inquiry-only." };
+  }
+
+  // The variant must belong to this product; with several options the customer must pick one.
+  let variantId = parsed.data.variantId;
+  if (variantId) {
+    if (!product.variants.some((v) => v.id === variantId)) {
+      return { ok: false as const, error: "That option is not available." };
+    }
+  } else if (product.variants.length === 1) {
+    variantId = product.variants[0].id;
+  } else if (product.variants.length > 1) {
+    return { ok: false as const, error: "Please choose an available option first." };
   }
 
   const cart = await getOrCreateCart();

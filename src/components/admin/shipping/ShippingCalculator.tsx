@@ -46,7 +46,12 @@ export default function ShippingCalculator() {
         throw new Error(data.error || "Rate calculation failed");
       }
 
-      setResult(data);
+      // API responds { data: { zone, totalPaise, courierOptions, ... } }
+      setResult({
+        ...data.data,
+        zoneName: data.data.zone,
+        totalShippingChargePaise: data.data.totalPaise,
+      });
     } catch (e: any) {
       addToast(e.message, "error");
     } finally {
@@ -222,19 +227,19 @@ export default function ShippingCalculator() {
                       <div
                         key={co.courierId}
                         className={`p-2.5 rounded-lg border text-xs flex justify-between items-center ${
-                          co.serviceable
+                          co.isServiceable
                             ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-950 dark:text-emerald-200"
                             : "bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 text-gray-500 opacity-60"
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          {co.serviceable ? (
+                          {co.isServiceable ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                           ) : (
                             <XCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
                           )}
                           <span className="font-semibold">{co.courierName}</span>
-                          {co.serviceable && co.transitDays && (
+                          {co.isServiceable && co.transitDays && (
                             <span className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-gray-300 ml-2">
                               <Clock className="w-3 h-3" /> {co.transitDays} days expected
                             </span>
@@ -242,7 +247,7 @@ export default function ShippingCalculator() {
                         </div>
 
                         <div>
-                          {co.serviceable ? (
+                          {co.isServiceable ? (
                             <span className="font-mono text-emerald-700 dark:text-emerald-300 font-bold">
                               {co.costPaise ? `Cost: ${formatPaise(co.costPaise)}` : "Serviceable"}
                             </span>

@@ -11,16 +11,21 @@ interface OrderLine {
   productName: string;
   quantity: number;
   price: number;
+  status?: string;
+  cancelledQty?: number;
   shipmentLines?: Array<{ quantity: number }>;
 }
 
 interface OrderData {
   id: string;
   orderNumber: string;
-  customerName: string;
-  deliveryPincode: string;
-  deliveryCity: string;
-  deliveryState: string;
+  customerName?: string | null;
+  // Callers pass either pre-flattened fields or the order's address snapshot
+  deliveryPincode?: string;
+  deliveryCity?: string;
+  deliveryState?: string;
+  shippingAddress?: string | Record<string, any>;
+  parsedShipping?: Record<string, any>;
   totalAmount: number;
   shippingCost: number;
   deliveryZone?: string;
@@ -28,16 +33,41 @@ interface OrderData {
   items: OrderLine[];
 }
 
+// Matches CourierOption from GET /api/admin/shipping/serviceability
 interface CourierServiceOption {
   courierId: string;
   courierName: string;
   courierCode: string;
   integrationMode: string;
-  serviceable: boolean;
-  reason?: string;
+  isServiceable: boolean;
+  reasonDisabled?: string;
   costPaise?: number;
   transitDays?: number;
   supportsCod: boolean;
+}
+
+function getDestination(order: OrderData) {
+  let addr: any = order.parsedShipping || order.shippingAddress || {};
+  if (typeof addr === "string") {
+    try {
+      addr = JSON.parse(addr);
+    } catch {
+      addr = {};
+    }
+  }
+  return {
+    name: order.customerName || addr.fullName || "Customer",
+    pincode: String(order.deliveryPincode || addr.pincode || addr.postalCode || "").trim(),
+    city: order.deliveryCity || addr.city || "",
+    state: order.deliveryState || addr.state || "",
+  };
+}
+
+/** Units of a line still to ship: cancelled lines and quantities never ship. */
+function shippableQty(item: OrderLine) {
+  if (item.status === "CANCELLED") return 0;
+  const alreadyShipped = item.shipmentLines?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
+  return Math.max(0, item.quantity - (item.cancelledQty || 0) - alreadyShipped);
 }
 
 interface CreateShipmentDrawerProps {
@@ -72,8 +102,7 @@ export default function CreateShipmentDrawer({
     let totalWeight = 0;
 
     order.items.forEach((item) => {
-      const alreadyShipped = item.shipmentLines?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
-      const available = Math.max(0, item.quantity - alreadyShipped);
+      const available = shippableQty(item);
 
       if (available > 0) {
         initialLines[item.id] = { selected: true, quantity: available };
@@ -87,21 +116,25 @@ export default function CreateShipmentDrawer({
     setManualAwb("");
 
     // Fetch courier serviceability for destination pincode
-    fetchServiceability(order.deliveryPincode, totalWeight || 500);
+    fetchServiceability(getDestination(order).pincode, totalWeight || 500);
   }, [order]);
 
   async function fetchServiceability(pincode: string, weight: number) {
-    if (!pincode) return;
+    if (!pincode) {
+      setCourierOptions([]);
+      setSelectedCourierId("");
+      return;
+    }
     setFetchingCouriers(true);
     try {
       const res = await fetch(`/api/admin/shipping/serviceability?pincode=${pincode}&weightGrams=${weight}`);
       if (res.ok) {
         const data = await res.json();
-        const options: CourierServiceOption[] = data.couriers || [];
+        const options: CourierServiceOption[] = data.data?.couriers || [];
         setCourierOptions(options);
 
         // Auto-select first serviceable courier
-        const firstServiceable = options.find((c) => c.serviceable);
+        const firstServiceable = options.find((c) => c.isServiceable);
         if (firstServiceable) {
           setSelectedCourierId(firstServiceable.courierId);
         }
@@ -163,8 +196,7 @@ export default function CreateShipmentDrawer({
   let anyUnshipped = false;
   if (order) {
     for (const item of order.items) {
-      const alreadyShipped = item.shipmentLines?.reduce((sum, sl) => sum + sl.quantity, 0) || 0;
-      const avail = item.quantity - alreadyShipped;
+      const avail = shippableQty(item);
       const willShip = selectedLines[item.id]?.selected ? selectedLines[item.id].quantity : 0;
       if (avail - willShip > 0) {
         anyUnshipped = true;
@@ -233,6 +265,7 @@ export default function CreateShipmentDrawer({
   }
 
   if (!order) return null;
+  const destination = getDestination(order);
 
   return (
     <Drawer
@@ -246,14 +279,14 @@ export default function CreateShipmentDrawer({
         <div className="bg-[var(--gray-50)] dark:bg-[var(--gray-800)] p-4 rounded-lg border border-[var(--gray-200)] dark:border-[var(--gray-700)] text-sm">
           <div className="flex justify-between items-center mb-1">
             <span className="font-semibold text-[var(--gray-900)] dark:text-white">
-              {order.customerName}
+              {destination.name}
             </span>
             <span className="text-xs px-2 py-0.5 rounded font-mono bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-              PIN: {order.deliveryPincode}
+              PIN: {destination.pincode || "missing"}
             </span>
           </div>
           <div className="text-[var(--gray-600)] dark:text-[var(--gray-400)] text-xs">
-            {order.deliveryCity}, {order.deliveryState}
+            {destination.city}, {destination.state}
           </div>
         </div>
 
@@ -267,9 +300,9 @@ export default function CreateShipmentDrawer({
           </div>
 
           <div className="space-y-2 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg divide-y divide-[var(--gray-200)] dark:divide-[var(--gray-700)]">
-            {order.items.map((item) => {
+            {order.items.filter((item) => item.status !== "CANCELLED").map((item) => {
               const alreadyShipped = item.shipmentLines?.reduce((s, sl) => s + sl.quantity, 0) || 0;
-              const available = Math.max(0, item.quantity - alreadyShipped);
+              const available = shippableQty(item);
               const lineState = selectedLines[item.id] || { selected: false, quantity: available };
 
               if (available === 0) {
@@ -339,7 +372,7 @@ export default function CreateShipmentDrawer({
                 onChange={(e) => {
                   const val = parseInt(e.target.value, 10) || 0;
                   setWeightGrams(val);
-                  fetchServiceability(order.deliveryPincode, val);
+                  fetchServiceability(destination.pincode, val);
                 }}
                 className="w-full px-3 py-2 border border-[var(--gray-300)] dark:border-[var(--gray-600)] rounded-lg bg-white dark:bg-[var(--gray-800)] text-sm"
               />
@@ -360,10 +393,21 @@ export default function CreateShipmentDrawer({
             {fetchingCouriers && <span className="text-xs text-blue-600 animate-pulse">Checking pincode...</span>}
           </div>
 
+          {!destination.pincode && (
+            <p className="text-xs text-red-600">
+              This order&apos;s delivery address has no pincode. Edit the shipping address first.
+            </p>
+          )}
+          {destination.pincode && !fetchingCouriers && courierOptions.length === 0 && (
+            <p className="text-xs text-red-600">
+              No active courier is configured for pincode {destination.pincode}.
+            </p>
+          )}
+
           <div className="space-y-2 border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg divide-y divide-[var(--gray-200)] dark:divide-[var(--gray-700)]">
             {courierOptions.map((c) => {
               const isSelected = selectedCourierId === c.courierId;
-              const isAvailable = c.serviceable;
+              const isAvailable = c.isServiceable;
 
               return (
                 <div
@@ -411,7 +455,7 @@ export default function CreateShipmentDrawer({
                             </span>
                           </>
                         ) : (
-                          <span className="text-red-500">{c.reason || "Not serviceable for this pincode"}</span>
+                          <span className="text-red-500">{c.reasonDisabled || "Not serviceable for this pincode"}</span>
                         )}
                       </div>
                     </div>
@@ -432,7 +476,7 @@ export default function CreateShipmentDrawer({
           {/* CRITICAL PRD RULE: Cost vs Charge Separation */}
           <div className="p-3 bg-[var(--gray-50)] dark:bg-[var(--gray-800)] border border-[var(--gray-200)] dark:border-[var(--gray-700)] rounded-lg text-xs space-y-1">
             <div className="text-[var(--gray-500)]">
-              Serviceability for <strong className="text-[var(--gray-800)] dark:text-gray-200">{order.deliveryPincode}</strong>
+              Serviceability for <strong className="text-[var(--gray-800)] dark:text-gray-200">{destination.pincode || "—"}</strong>
             </div>
             <div className="text-[var(--gray-700)] dark:text-gray-300">
               Customer was charged <strong>₹{order.shippingCost.toFixed(2)}</strong> ({order.deliveryZone || "Rest of India zone"}) —{" "}

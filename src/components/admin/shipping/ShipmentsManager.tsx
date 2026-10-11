@@ -112,9 +112,10 @@ export default function ShipmentsManager() {
       const res = await fetch("/api/admin/couriers");
       if (res.ok) {
         const data = await res.json();
-        setCouriers(data.couriers || []);
-        if (data.couriers && data.couriers.length > 0) {
-          setManifestCourierId(data.couriers[0].id);
+        const couriers = data.data || [];
+        setCouriers(couriers);
+        if (couriers.length > 0) {
+          setManifestCourierId(couriers[0].id);
         }
       }
     } catch (e) {
