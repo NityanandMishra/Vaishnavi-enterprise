@@ -85,15 +85,19 @@ export default function StorefrontHeader({ categories }: { categories: NavCatego
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
 
-          {/* Brand Mark (§5.5) */}
-          <Link href="/" className="mark flex-shrink-0" onClick={closeMenus}>
-            <div className="w-9 h-9 rounded bg-[var(--accent)] text-white flex items-center justify-center font-bold flex-shrink-0">
-              <Zap size={20} className="fill-white" />
-            </div>
-            <div className="min-w-0">
-              <b className="tracking-tight">VAISHNAVI</b>
-              <small>SURIYAWAN · BHADOHI</small>
-            </div>
+          {/* Logo */}
+          <Link
+            href="/"
+            aria-label="Vaishnavi Enterprises — home"
+            className="flex-shrink-0 flex items-center md:mr-2"
+            onClick={closeMenus}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Vaishnavi Enterprises"
+              className="h-10 md:h-11 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop Navigation Links (Max 4 links as specified in §5.5) */}

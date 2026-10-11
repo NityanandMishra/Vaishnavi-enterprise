@@ -34,12 +34,18 @@ export default function StorefrontFooter() {
         <div className="base-grid">
           {/* Column 1: Brand & Firm Identity */}
           <div>
-            <div className="flex items-center gap-2 mb-3 text-white">
-              <div className="w-8 h-8 rounded bg-[var(--copper-600)] flex items-center justify-center font-bold text-white">
-                <Zap size={18} className="fill-white" />
-              </div>
-              <h3 className="font-bold text-lg tracking-tight">VAISHNAVI ENTERPRISES</h3>
-            </div>
+            <Link
+              href="/"
+              aria-label="Vaishnavi Enterprises — home"
+              className="inline-flex mb-4"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-inverse.png"
+                alt="Vaishnavi Enterprises"
+                className="h-10 w-auto object-contain"
+              />
+            </Link>
             <p className="text-sm text-slate-300 leading-relaxed mb-4">
               Authorised distributor & direct retailer for Crompton, Havells, Polycab, Finolex, Microtek, and ZOE Motors.
             </p>
