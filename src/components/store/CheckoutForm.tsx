@@ -489,7 +489,7 @@ export default function CheckoutForm({
             />
             <div>
               <span className="text-sm font-bold text-[var(--fg)] block">
-                I need a commercial GST Tax Invoice in my firm's name
+                I need a commercial GST Tax Invoice in my firm&apos;s name
               </span>
               <span className="text-xs text-[var(--fg-muted)] block mt-0.5">
                 Enable input tax credit (ITC) on this business purchase.

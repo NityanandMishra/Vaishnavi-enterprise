@@ -500,8 +500,8 @@ export default function OrderDetailPage() {
 
                       {isCancelled && item.adjustments?.[0] && (
                         <div className="mt-1 text-xs text-rose-700 font-medium not-line-through">
-                          Cancelled by {item.adjustments[0].createdBy || "Staff"} · "
-                          {item.adjustments[0].reason}"
+                          Cancelled by {item.adjustments[0].createdBy || "Staff"} · &quot;
+                          {item.adjustments[0].reason}&quot;
                         </div>
                       )}
                     </div>

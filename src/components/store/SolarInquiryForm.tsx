@@ -354,7 +354,7 @@ export default function SolarInquiryForm() {
       {step === 2 && (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            Last step — tell us where to reach you. We'll call to schedule a free site assessment.
+            Last step — tell us where to reach you. We&apos;ll call to schedule a free site assessment.
           </p>
           <Field label="Your name">
             <input

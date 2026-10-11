@@ -548,7 +548,7 @@ export default function ProductsPage() {
                   No drafts
                 </h3>
                 <p className="text-[var(--text-xs)] text-[var(--color-fg-muted)] max-w-sm mx-auto">
-                  Products you start but don't publish will appear here.
+                  Products you start but don&apos;t publish will appear here.
                 </p>
               </>
             ) : (

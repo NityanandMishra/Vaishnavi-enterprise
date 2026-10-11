@@ -202,7 +202,7 @@ export default function StockHistoryDrawer({
                   {/* Note & Reference */}
                   {(mov.note || mov.referenceId) && (
                     <p className="text-xs text-[var(--color-fg-muted)] italic">
-                      "{mov.note || `${mov.referenceType}: ${mov.referenceId}`}"
+                      &quot;{mov.note || `${mov.referenceType}: ${mov.referenceId}`}&quot;
                     </p>
                   )}
 

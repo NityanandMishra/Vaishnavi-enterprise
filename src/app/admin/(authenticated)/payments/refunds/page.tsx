@@ -306,7 +306,7 @@ export default function RefundQueuePage() {
 
                 {refund.note && (
                   <div className="p-3 bg-amber-50/60 rounded border border-amber-100 text-xs text-amber-900">
-                    <span className="font-semibold">Requester Note: </span>"{refund.note}"
+                    <span className="font-semibold">Requester Note: </span>&quot;{refund.note}&quot;
                   </div>
                 )}
 
