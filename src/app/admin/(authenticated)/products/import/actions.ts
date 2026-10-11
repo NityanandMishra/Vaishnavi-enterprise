@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/nextauth";
 import { generateSlug } from "@/lib/validations/product";
+import { CATALOG_WRITE_ROLES } from "@/lib/api-guard";
 
 interface ValidationRow {
   rowNumber: number;
@@ -25,9 +26,18 @@ interface ValidationRow {
   warnings: string[];
 }
 
+const IMPORT_ROLES = ["ADMIN", "SUPER_ADMIN", ...CATALOG_WRITE_ROLES];
+
+/**
+ * Returns the session only for staff allowed to import products.
+ * getServerSession() throws outside a request (e.g. scripts/test-prod-epic.ts);
+ * only then, and never in production, a script identity is used.
+ */
 async function getSessionSafe() {
   try {
-    return await getServerSession(authOptions);
+    const session = await getServerSession(authOptions);
+    const role = (session?.user as any)?.role;
+    return session && IMPORT_ROLES.includes(role) ? session : null;
   } catch {
     if (process.env.NODE_ENV !== "production") {
       return { user: { role: "ADMIN", id: "script-admin" } };

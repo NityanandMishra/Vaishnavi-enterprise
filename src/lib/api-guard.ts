@@ -11,6 +11,7 @@ export const INVENTORY_ADJUST_ROLES = ["CATALOG_MANAGER", "OPS_EXECUTIVE"];
 export const ORDER_READ_ROLES = ["OPS_EXECUTIVE", "FINANCE"];
 export const ORDER_WRITE_ROLES = ["OPS_EXECUTIVE"];
 export const FINANCE_ROLES = ["FINANCE"];
+export const LEAD_ROLES = ["OPS_EXECUTIVE"]; // product enquiries (INQUIRE) contain customer contact details
 export const TAX_READ_ROLES = ["FINANCE", "CATALOG_MANAGER"]; // matches requireTaxRead()
 
 type GuardResult =

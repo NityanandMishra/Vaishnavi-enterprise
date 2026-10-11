@@ -1,5 +1,7 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { CATALOG_WRITE_ROLES, STAFF_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import {
@@ -37,6 +39,7 @@ export interface GetProductsParams {
 
 export async function getProducts(params: GetProductsParams = {}) {
   try {
+    await requireRole(STAFF_ROLES);
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
     const skip = (page - 1) * limit;
@@ -186,6 +189,7 @@ export async function getProducts(params: GetProductsParams = {}) {
 
 export async function getProductDetails(id: string) {
   try {
+    await requireRole(STAFF_ROLES);
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
@@ -260,6 +264,7 @@ export async function getProductDetails(id: string) {
 
 export async function getFormMetadata(categoryId?: string) {
   try {
+    await requireRole(STAFF_ROLES);
     const [categories, brands, images, attributes] = await Promise.all([
       prisma.category.findMany({
         where: { deletedAt: null },
@@ -317,6 +322,7 @@ export async function getFormMetadata(categoryId?: string) {
 
 export async function saveProductDraft(data: any) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const parsed = productDraftSchema.safeParse(data);
     if (!parsed.success) {
       return {
@@ -566,6 +572,7 @@ export async function saveProductDraft(data: any) {
 
 export async function publishProduct(id: string, formData?: any) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     // 1. If formData is provided, save it first
     if (formData) {
       formData.id = id;
@@ -693,6 +700,7 @@ export async function updateProductStatus(
   targetStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" | "RESTORE"
 ) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
@@ -778,6 +786,7 @@ export async function updateProductStatus(
 
 export async function duplicateProduct(id: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const source = await prisma.product.findUnique({
       where: { id },
       include: {
@@ -905,6 +914,7 @@ export async function bulkUpdateStatus(
   action: "ACTIVATE" | "DEACTIVATE" | "ARCHIVE"
 ) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     if (!productIds || productIds.length === 0) {
       return { success: false, error: "No products selected" };
     }
@@ -981,6 +991,7 @@ export async function bulkUpdateStatus(
 
 export async function bulkChangeCategory(productIds: string[], targetCategoryId: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const targetCategory = await prisma.category.findUnique({
       where: { id: targetCategoryId },
       include: {
@@ -1051,6 +1062,7 @@ function applyRounding(val: number, rounding: string): number {
 
 export async function bulkAdjustPrice(params: BulkPriceAdjustParams) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const { productIds, mode, direction, value, applyTo, rounding, conflictResolution, dryRun } =
       params;
 
@@ -1206,6 +1218,7 @@ export async function bulkAdjustPrice(params: BulkPriceAdjustParams) {
 
 export async function undoPriceAdjustment(batchId: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const auditRecord = await prisma.auditLog.findFirst({
       where: {
         entity: "PRICE_BATCH",
@@ -1262,6 +1275,7 @@ export async function undoPriceAdjustment(batchId: string) {
 
 export async function getSavedViews() {
   try {
+    await requireRole(STAFF_ROLES);
     const views = await prisma.savedProductView.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -1273,6 +1287,7 @@ export async function getSavedViews() {
 
 export async function saveProductView(name: string, filters: Record<string, any>) {
   try {
+    await requireRole(STAFF_ROLES);
     const view = await prisma.savedProductView.create({
       data: {
         name,
@@ -1287,6 +1302,7 @@ export async function saveProductView(name: string, filters: Record<string, any>
 
 export async function deleteSavedView(id: string) {
   try {
+    await requireRole(STAFF_ROLES);
     await prisma.savedProductView.delete({ where: { id } });
     return { success: true };
   } catch (error: any) {
@@ -1298,6 +1314,7 @@ export async function deleteSavedView(id: string) {
 
 export async function deleteProduct(id: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const orderItemCount = await prisma.orderItem.count({
       where: { productId: id },
     });
@@ -1325,15 +1342,18 @@ export async function deleteProduct(id: string) {
 // ─── COMPATIBILITY ALIASES FOR PREVIOUS PAGES ────────────────────────────────
 
 export async function createProduct(data: any) {
+  await requireRole(CATALOG_WRITE_ROLES);
   return saveProductDraft(data);
 }
 
 export async function updateProduct(id: string, data: any) {
+  await requireRole(CATALOG_WRITE_ROLES);
   return saveProductDraft({ ...data, id });
 }
 
 export async function toggleProductAvailability(id: string, isAvailable: boolean) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const updated = await prisma.product.update({
       where: { id },
       data: {

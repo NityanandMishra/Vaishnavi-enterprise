@@ -1,10 +1,13 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { LEAD_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export async function getLeads() {
   try {
+    await requireRole(LEAD_ROLES);
     const leads = await prisma.lead.findMany({
       orderBy: {
         createdAt: "desc",
@@ -20,6 +23,7 @@ export async function getLeads() {
 
 export async function getLeadDetails(id: string) {
   try {
+    await requireRole(LEAD_ROLES);
     const lead = await prisma.lead.findUnique({
       where: { id },
       include: {
@@ -54,6 +58,7 @@ export async function getLeadDetails(id: string) {
 
 export async function updateLeadStatus(id: string, status: string) {
   try {
+    await requireRole(LEAD_ROLES);
     const lead = await prisma.lead.update({
       where: { id },
       data: { status },
@@ -76,6 +81,7 @@ export async function updateLeadNotes(
   }
 ) {
   try {
+    await requireRole(LEAD_ROLES);
     const lead = await prisma.lead.update({
       where: { id },
       data: {
