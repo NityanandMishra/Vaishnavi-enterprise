@@ -63,6 +63,7 @@ interface Category {
   parentId?: string | null;
   hsnCode?: string | null;
   gstRate?: number | null;
+  defaultCheckoutMode?: string | null; // "BUY" | "INQUIRE"
   categoryAttributes?: Array<{
     isRequired: boolean;
     displayOrder: number;
@@ -293,6 +294,7 @@ export default function ProductForm({
         brandId,
         unit,
         hsnCode: activeHsn,
+        checkoutMode: initialProduct?.checkoutMode || selectedCategory?.defaultCheckoutMode || "BUY",
         metaDescription,
         images: mediaItems.map((m) => ({ imageId: m.id, altText: m.altText })),
         variants: activeVariants,

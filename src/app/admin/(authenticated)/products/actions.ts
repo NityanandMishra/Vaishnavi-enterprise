@@ -366,6 +366,13 @@ export async function saveProductDraft(data: any) {
       }
     }
 
+    const targetCategory = targetCategoryId
+      ? await prisma.category.findUnique({
+          where: { id: targetCategoryId },
+          select: { defaultCheckoutMode: true },
+        })
+      : null;
+
     const savedProduct = await prisma.$transaction(async (tx) => {
       let productRecord;
 
@@ -406,7 +413,8 @@ export async function saveProductDraft(data: any) {
             unit: d.unit || "Piece",
             hsnCode: d.hsnCode || null,
             gstRate: d.gstRate ? Number(d.gstRate) : null,
-            checkoutMode: d.checkoutMode || "BUY",
+            // New products follow their category's BUY/INQUIRE default unless set explicitly
+            checkoutMode: d.checkoutMode || targetCategory?.defaultCheckoutMode || "BUY",
             stockMode: d.stockMode || "TRACKED",
             status: "DRAFT",
             isAvailable: false,
@@ -623,6 +631,7 @@ export async function publishProduct(id: string, formData?: any) {
         brandId: product.brandId,
         unit: product.unit,
         hsnCode: product.hsnCode,
+        checkoutMode: product.checkoutMode,
         metaDescription: product.metaDescription,
         images: product.images.map((img) => ({
           imageId: img.imageId,
