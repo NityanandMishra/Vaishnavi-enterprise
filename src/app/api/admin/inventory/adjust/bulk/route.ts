@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/nextauth";
+import { guardApiRole, CATALOG_WRITE_ROLES } from "@/lib/api-guard";
 import { bulkAdjustStock } from "@/lib/inventory/inventory-service";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const user = session?.user;
-  const role = (user as any)?.role;
-  if (!session || (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guardApiRole(CATALOG_WRITE_ROLES);
+  if (auth.response) return auth.response;
+  const user = auth.user;
 
   try {
     const json = await request.json();

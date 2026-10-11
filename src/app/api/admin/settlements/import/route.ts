@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
+import { guardApiRole, FINANCE_ROLES } from "@/lib/api-guard";
 import { importSettlement } from "@/lib/payments/payment-service";
 import { parsePaise } from "@/lib/money";
 
@@ -9,10 +9,9 @@ import { parsePaise } from "@/lib/money";
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(FINANCE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const allowedRoles = ["SUPER_ADMIN", "ADMIN", "FINANCE"];
     if (!allowedRoles.includes(user.role)) {

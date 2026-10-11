@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+// Keep in sync with STAFF_ROLES in src/lib/api-guard.ts (not importable on the Edge runtime).
+const STAFF_ROLES = ["ADMIN", "SUPER_ADMIN", "CATALOG_MANAGER", "FINANCE", "OPS_EXECUTIVE"];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -22,6 +25,22 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(targetUrl);
   }
 
+  // ── Admin API protection (defence in depth; each route also checks roles) ─
+  if (pathname.startsWith("/api/admin")) {
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+    if (!token) {
+      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+    }
+    const role = token.role as string | undefined;
+    if (!role || !STAFF_ROLES.includes(role)) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
+
   // ── Admin route protection ──────────────────────────────────────────────
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
     const token = await getToken({
@@ -38,8 +57,7 @@ export async function middleware(req: NextRequest) {
 
     // Logged in but not an admin role → redirect to customer account
     const role = token.role as string | undefined;
-    const adminRoles = ["ADMIN", "SUPER_ADMIN", "CATALOG_MANAGER", "FINANCE", "OPS_EXECUTIVE"];
-    if (!role || !adminRoles.includes(role)) {
+    if (!role || !STAFF_ROLES.includes(role)) {
       return NextResponse.redirect(new URL("/account", req.url));
     }
   }
@@ -62,5 +80,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/config/:path*", "/sales/:path*", "/account/:path*", "/checkout/:path*"],
+  matcher: ["/api/admin/:path*", "/admin/:path*", "/config/:path*", "/sales/:path*", "/account/:path*", "/checkout/:path*"],
 };

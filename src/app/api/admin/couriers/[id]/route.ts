@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ADMIN_ONLY } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 
 /**
  * PATCH /api/admin/couriers/:id
@@ -10,10 +10,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { createManualOrder } from "@/lib/orders/order-service";
 
@@ -8,6 +9,8 @@ import { createManualOrder } from "@/lib/orders/order-service";
  */
 export async function GET(req: NextRequest) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const { searchParams } = new URL(req.url);
 
     const view = searchParams.get("view") || "needs_action"; // "needs_action" | "all"
@@ -227,6 +230,8 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
     const body = await req.json();
     const result = await createManualOrder(body);
     return NextResponse.json(result, { status: 201 });

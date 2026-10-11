@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 
 export async function GET(
@@ -6,6 +7,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const { id } = await params;
 
     // Look up by id or manifestNumber

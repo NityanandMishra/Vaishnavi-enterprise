@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import {
+  guardApiRole,
+  ADMIN_ONLY,
+  CATALOG_WRITE_ROLES,
+  ORDER_READ_ROLES,
+  ORDER_WRITE_ROLES,
+  STAFF_ROLES,
+} from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { authOptions } from "@/lib/nextauth";
 
 function escapeCSV(val: any): string {
   if (val === null || val === undefined) return "";
@@ -12,15 +18,21 @@ function escapeCSV(val: any): string {
   return str;
 }
 
-export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER")) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+// Orders and leads contain customer PII, so each export type has its own roles.
+const EXPORT_ROLES: Record<string, string[]> = {
+  orders: ORDER_READ_ROLES,
+  inventory: STAFF_ROLES,
+  leads: ORDER_WRITE_ROLES,
+  attributes: CATALOG_WRITE_ROLES,
+  "products-template": CATALOG_WRITE_ROLES,
+};
 
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") || "orders";
+
+  const auth = await guardApiRole(EXPORT_ROLES[type] ?? ADMIN_ONLY);
+  if (auth.response) return auth.response;
   const dateStr = new Date().toISOString().slice(0, 10);
 
   let csvContent = "";

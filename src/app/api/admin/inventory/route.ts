@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/nextauth";
+import { guardApiRole, STAFF_ROLES } from "@/lib/api-guard";
 import { getInventoryOverview } from "@/lib/inventory/inventory-service";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER" && role !== "OPS_EXECUTIVE" && role !== "FINANCE")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guardApiRole(STAFF_ROLES);
+  if (auth.response) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1", 10);

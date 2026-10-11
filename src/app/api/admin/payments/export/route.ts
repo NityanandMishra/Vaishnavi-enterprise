@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, FINANCE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 import { formatPaise, parsePaise } from "@/lib/money";
 
 /**
@@ -9,10 +9,9 @@ import { formatPaise, parsePaise } from "@/lib/money";
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(FINANCE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim();

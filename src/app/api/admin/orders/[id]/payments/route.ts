@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 
 /**
  * GET /api/admin/orders/:id/payments
@@ -12,10 +12,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const { id } = params;
 

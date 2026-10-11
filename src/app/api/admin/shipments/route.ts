@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
 import {
   createShipment,
   dispatchShipment,
@@ -13,10 +13,9 @@ import {
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim();
@@ -166,10 +165,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const { orderId, lines, courierId, weightGrams, awbNumber, dispatchImmediately } = body;

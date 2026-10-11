@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
+import { guardApiRole, ADMIN_ONLY } from "@/lib/api-guard";
 import { addZoneRule, bulkAddPincodesToZone } from "@/lib/shipping/shipping-service";
 
 /**
@@ -11,10 +11,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });

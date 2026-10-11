@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, TAX_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { calculateTax } from "@/lib/tax/tax-engine";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await guardApiRole(TAX_READ_ROLES);
+    if (auth.response) return auth.response;
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("productId");
     const priceStr = searchParams.get("price");

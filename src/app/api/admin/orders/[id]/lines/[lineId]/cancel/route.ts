@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { cancelOrderLine, OrderTransitionError } from "@/lib/orders/order-service";
 
 /**
@@ -10,9 +11,12 @@ export async function POST(
   { params }: { params: { id: string; lineId: string } }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
     const { id: orderId, lineId } = params;
     const body = await req.json();
-    const { quantity, reason, actor = "Staff" } = body;
+    const { quantity, reason } = body;
+    const actor = auth.user.name; // audit actor comes from the session, never the request body
 
     const result = await cancelOrderLine(orderId, lineId, {
       quantity: quantity ? parseInt(quantity, 10) : undefined,

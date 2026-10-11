@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { ORDER_TRANSITIONS, OrderStatus } from "@/lib/orders/order-types";
 
@@ -11,6 +12,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const orderId = params.id;
 
     const order = await prisma.order.findFirst({
