@@ -67,7 +67,7 @@ export default function CouriersManager() {
       const res = await fetch("/api/admin/couriers");
       if (res.ok) {
         const data = await res.json();
-        setCouriers(data.couriers || []);
+        setCouriers(data.data || []);
       }
     } catch (e) {
       console.error(e);

@@ -671,6 +671,7 @@ export async function resolveShippingRate(req: RateResolutionRequest): Promise<R
         courierId: c.id,
         courierName: c.name,
         courierCode: c.code,
+        integrationMode: c.integrationMode,
         costPaise: costRate?.costPaise ?? 4900,
         transitDays: match?.transitDays ?? 3,
         isServiceable: isServ,
@@ -931,7 +932,7 @@ export async function createShipment(input: CreateShipmentInput) {
     }
 
     const alreadyShippedQty = orderLine.shipmentLines.reduce((sum, sl) => sum + sl.quantity, 0);
-    const availableToShip = orderLine.quantity - alreadyShippedQty;
+    const availableToShip = orderLine.quantity - (orderLine.cancelledQty || 0) - alreadyShippedQty;
 
     if (lineReq.quantity > availableToShip) {
       throw new Error(

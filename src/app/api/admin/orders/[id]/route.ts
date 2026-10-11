@@ -38,6 +38,7 @@ export async function GET(
             adjustments: {
               orderBy: { createdAt: "desc" },
             },
+            shipmentLines: { select: { quantity: true } }, // remaining-to-ship in the shipment drawer
           },
         },
         statusHistory: {

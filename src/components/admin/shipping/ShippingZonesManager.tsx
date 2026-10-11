@@ -112,9 +112,10 @@ export default function ShippingZonesManager() {
       const res = await fetch("/api/admin/shipping/zones");
       if (res.ok) {
         const data = await res.json();
-        setZones(data.zones || []);
-        if (data.zones && data.zones.length > 0 && !selectedZoneId) {
-          setSelectedZoneId(data.zones[0].id);
+        const zones = data.data || [];
+        setZones(zones);
+        if (zones.length > 0 && !selectedZoneId) {
+          setSelectedZoneId(zones[0].id);
         }
       }
     } catch (e) {
@@ -181,11 +182,11 @@ export default function ShippingZonesManager() {
       }
 
       const data = await res.json();
-      addToast(`Zone '${data.zone.name}' created!`, "success");
+      addToast(`Zone '${data.data.name}' created!`, "success");
       setIsAddZoneModalOpen(false);
       setNewZoneName("");
       fetchZones();
-      setSelectedZoneId(data.zone.id);
+      setSelectedZoneId(data.data.id);
     } catch (e: any) {
       addToast(e.message, "error");
     }
