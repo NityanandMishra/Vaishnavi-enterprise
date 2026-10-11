@@ -111,7 +111,7 @@ export default function AddressManager({
           </div>
           <h3 className="text-sm font-bold text-slate-900 mb-1">No saved addresses</h3>
           <p className="text-xs text-slate-500 mb-4 max-w-sm mx-auto">
-            You haven't saved any addresses yet. Add your home or office address for fast checkout.
+            You haven&apos;t saved any addresses yet. Add your home or office address for fast checkout.
           </p>
           <button
             type="button"

@@ -194,6 +194,7 @@ export async function updateVariantSettings(
  */
 export async function fetchVariantMovements(variantId: string, page = 1, limit = 50) {
   try {
+    await requireAdmin();
     const movements = await prisma.inventoryMovement.findMany({
       where: { variantId },
       orderBy: { createdAt: "desc" },

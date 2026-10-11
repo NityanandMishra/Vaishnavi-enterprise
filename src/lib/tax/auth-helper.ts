@@ -12,10 +12,12 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
   const session = await getServerSession(authOptions);
   if (!session || !session.user) return null;
   const user = session.user as any;
+  if (!user.id) return null;
   return {
-    id: user.id || "system",
-    name: user.name || "Admin",
-    role: user.role || "ADMIN",
+    id: user.id,
+    name: user.name || user.email || "Staff",
+    // Never default to a privileged role: a session without a role has no access.
+    role: user.role || "CUSTOMER",
     email: user.email,
   };
 }

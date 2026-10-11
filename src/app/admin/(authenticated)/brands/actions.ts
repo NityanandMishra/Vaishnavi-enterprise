@@ -1,10 +1,13 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { CATALOG_WRITE_ROLES, STAFF_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export async function getBrands() {
   try {
+    await requireRole(STAFF_ROLES);
     const brands = await prisma.brand.findMany({
       include: {
         logo: true,
@@ -28,6 +31,7 @@ export async function getBrands() {
 
 export async function getLogoImages() {
   try {
+    await requireRole(STAFF_ROLES);
     const images = await prisma.mediaImage.findMany({
       orderBy: {
         createdAt: "desc",
@@ -47,6 +51,7 @@ export async function createBrand(data: {
   logoId?: string | null;
 }) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     if (!data.name.trim()) {
       throw new Error("Brand name is required");
     }
@@ -95,6 +100,7 @@ export async function updateBrand(
   }
 ) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     if (!data.name.trim()) {
       throw new Error("Brand name is required");
     }
@@ -132,6 +138,7 @@ export async function updateBrand(
 
 export async function deleteBrand(id: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const brand = await prisma.brand.findUnique({
       where: { id },
       include: {

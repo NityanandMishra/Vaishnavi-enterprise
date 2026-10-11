@@ -23,8 +23,17 @@ import { updateTaxSettingsAction } from "@/app/admin/(authenticated)/tax/actions
 
 interface TaxSettingsData {
   id: string;
-  sellerStateCode: string;
-  sellerGstin: string;
+  sellerStateCode: string | null;
+  sellerGstin: string | null;
+  sellerLegalName: string | null;
+  sellerTradeName: string | null;
+  sellerAddressLine1: string | null;
+  sellerAddressLine2: string | null;
+  sellerCity: string | null;
+  sellerPincode: string | null;
+  sellerPhone: string | null;
+  sellerEmail: string | null;
+  invoicingProblems: string[];
   pricingMode: "EXCLUSIVE" | "INCLUSIVE" | string;
   defaultHsnId?: string | null;
   defaultHsn?: {
@@ -45,7 +54,19 @@ export default function TaxSettingsForm({
   hsns: Array<{ id: string; code: string; description: string }>;
 }) {
   const [gstin, setGstin] = useState(initialSettings.sellerGstin || "");
-  const [stateCode, setStateCode] = useState(initialSettings.sellerStateCode || "27");
+  const [stateCode, setStateCode] = useState(initialSettings.sellerStateCode || "");
+  const [seller, setSeller] = useState({
+    sellerLegalName: initialSettings.sellerLegalName || "",
+    sellerTradeName: initialSettings.sellerTradeName || "",
+    sellerAddressLine1: initialSettings.sellerAddressLine1 || "",
+    sellerAddressLine2: initialSettings.sellerAddressLine2 || "",
+    sellerCity: initialSettings.sellerCity || "",
+    sellerPincode: initialSettings.sellerPincode || "",
+    sellerPhone: initialSettings.sellerPhone || "",
+    sellerEmail: initialSettings.sellerEmail || "",
+  });
+  const setSellerField = (key: keyof typeof seller) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setSeller((prev) => ({ ...prev, [key]: e.target.value }));
   const [pricingMode, setPricingMode] = useState<"EXCLUSIVE" | "INCLUSIVE">(
     (initialSettings.pricingMode as any) || "EXCLUSIVE"
   );
@@ -122,10 +143,13 @@ export default function TaxSettingsForm({
     e.preventDefault();
     if (isReadOnly) return;
 
-    const check = validateGSTIN(gstin);
-    if (!check.isValid) {
-      setGstinError(check.error || "Invalid GSTIN");
-      return;
+    // GSTIN may be left empty while details are being collected; invoicing stays blocked until it is set.
+    if (gstin) {
+      const check = validateGSTIN(gstin);
+      if (!check.isValid) {
+        setGstinError(check.error || "Invalid GSTIN");
+        return;
+      }
     }
     setGstinError(null);
 
@@ -134,6 +158,7 @@ export default function TaxSettingsForm({
       const res = await updateTaxSettingsAction({
         sellerGstin: gstin.trim().toUpperCase(),
         sellerStateCode: stateCode,
+        ...seller,
         pricingMode,
         defaultHsnId: defaultHsnId || null,
         confirmationToken: pricingMode !== initialSettings.pricingMode ? "SWITCH" : undefined,
@@ -178,6 +203,16 @@ export default function TaxSettingsForm({
         </div>
       )}
 
+      {initialSettings.invoicingProblems.length > 0 && (
+        <div className="p-3.5 bg-[var(--amber-50)] border-l-4 border-[var(--amber-600)] text-[var(--amber-700)] rounded-r-[var(--radius-md)] text-[var(--text-sm)]">
+          <p className="font-bold">GST invoices cannot be generated yet</p>
+          <p className="mt-0.5">
+            Orders will not ship with an invoice until the seller details below are complete:{" "}
+            {initialSettings.invoicingProblems.join("; ")}.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* SECTION 1: Seller Identity */}
         <div className="bg-[var(--color-surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--gray-200)] shadow-sm space-y-4">
@@ -196,12 +231,11 @@ export default function TaxSettingsForm({
               </label>
               <input
                 type="text"
-                required
                 disabled={isReadOnly}
                 maxLength={15}
                 value={gstin}
                 onChange={(e) => handleGstinChange(e.target.value)}
-                placeholder="27AABCV1234K1Z5"
+                placeholder="Required before invoicing"
                 className={`w-full px-3 py-2 font-mono text-[var(--text-sm)] border rounded-[var(--radius-md)] uppercase focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] ${
                   gstinError
                     ? "border-[var(--red-500)] bg-[var(--red-50)]/30 text-[var(--red-900)]"
@@ -226,10 +260,14 @@ export default function TaxSettingsForm({
               </label>
               <select
                 disabled={isReadOnly}
+                required
                 value={stateCode}
                 onChange={(e) => setStateCode(e.target.value)}
                 className="w-full px-3 py-2 text-[var(--text-sm)] bg-white border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
               >
+                <option value="" disabled>
+                  Select state…
+                </option>
                 {INDIAN_STATES.map((s) => (
                   <option key={s.code} value={s.code}>
                     {s.code} — {s.name}
@@ -239,6 +277,120 @@ export default function TaxSettingsForm({
               <p className="text-[11px] text-[var(--gray-500)] mt-1">
                 Deliveries inside this state are taxed as CGST + SGST. Deliveries outside are IGST.
               </p>
+            </div>
+
+            {/* Printed on every GST invoice; * fields are required before invoicing */}
+            <div className="md:col-span-1">
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Legal Name <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerLegalName}
+                onChange={setSellerField("sellerLegalName")}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">As registered on the GST certificate</p>
+            </div>
+            <div>
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Trade Name
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerTradeName}
+                onChange={setSellerField("sellerTradeName")}
+                placeholder="Optional"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Address Line 1 <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerAddressLine1}
+                onChange={setSellerField("sellerAddressLine1")}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">Shop / building and street</p>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Address Line 2
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerAddressLine2}
+                onChange={setSellerField("sellerAddressLine2")}
+                placeholder="Optional"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">Area / landmark (optional)</p>
+            </div>
+            <div>
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                City / Town <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerCity}
+                onChange={setSellerField("sellerCity")}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+            </div>
+            <div>
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Pincode <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={seller.sellerPincode}
+                onChange={setSellerField("sellerPincode")}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">6 digits</p>
+            </div>
+            <div>
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Phone <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="tel"
+                disabled={isReadOnly}
+                value={seller.sellerPhone}
+                onChange={setSellerField("sellerPhone")}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">Printed on invoices</p>
+            </div>
+            <div>
+              <label className="block text-[var(--text-xs)] font-bold text-[var(--gray-700)] uppercase tracking-wider mb-1">
+                Email <span className="text-[var(--red-500)]">*</span>
+              </label>
+              <input
+                type="email"
+                disabled={isReadOnly}
+                value={seller.sellerEmail}
+                onChange={setSellerField("sellerEmail")}
+                placeholder="Required before invoicing"
+                className="w-full px-3 py-2 text-[var(--text-sm)] border border-[var(--gray-300)] rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-500)] disabled:bg-[var(--gray-100)] disabled:text-[var(--gray-600)]"
+              />
+              <p className="text-[11px] text-[var(--gray-500)] mt-1">Printed on invoices</p>
             </div>
           </div>
         </div>
@@ -359,7 +511,7 @@ export default function TaxSettingsForm({
         className="max-w-[480px]"
       >
         <div className="space-y-4 pt-2">
-          <div className="p-3.5 bg-[var(--amber-50)] border-l-4 border-[var(--amber-500)] text-[var(--amber-900)] rounded-r-[var(--radius-md)] space-y-2 text-[var(--text-sm)]">
+          <div className="p-3.5 bg-[var(--amber-50)] border-l-4 border-[var(--amber-600)] text-[var(--amber-700)] rounded-r-[var(--radius-md)] space-y-2 text-[var(--text-sm)]">
             <div className="flex items-center gap-2 font-bold text-[var(--amber-900)]">
               <AlertTriangle size={18} className="text-[var(--amber-600)]" />
               Revenue-wide Consequence Warning

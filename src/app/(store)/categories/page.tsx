@@ -6,6 +6,10 @@ import { prisma } from "@/lib/db";
 import ComingSoonTag from "@/components/store/ComingSoonTag";
 import Breadcrumbs from "@/components/store/Breadcrumbs";
 
+// Rendered per request: otherwise the category list is frozen at build time and
+// categories added in admin would not appear until the next deploy.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "All Categories",
   description: "Browse every product category at Vaishnavi Enterprises.",

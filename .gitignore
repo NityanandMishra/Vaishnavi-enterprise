@@ -25,9 +25,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# SQLite dev database
-/prisma/dev.db
-/prisma/dev.db-journal
+# SQLite databases
+*.db
+*.db-journal
 
 # Claude Code local settings
 .claude/settings.local.json
@@ -36,3 +36,10 @@ yarn-error.log*
 /Implementation Plans Docs/
 /docs/
 /Claude outputs/
+
+# Design mockups (local reference only)
+/extracted_mockup/
+/Vaishnavi Enterprises Admin Portal.html
+
+# User-uploaded media (created at runtime by the image library)
+/public/uploads/

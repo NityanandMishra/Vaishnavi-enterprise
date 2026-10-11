@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { taxSettingsInputSchema } from "@/lib/validations/tax";
+import { taxSettingsInputSchema, taxSettingsUpdateData } from "@/lib/validations/tax";
 import { requireTaxSettingsRead, requireTaxSettingsWrite } from "@/lib/tax/auth-helper";
 
 export async function GET(req: NextRequest) {
@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
       // Fallback create default if database had none
       settings = await prisma.taxSettings.create({
         data: {
-          sellerStateCode: "27",
-          sellerGstin: "27AABCV1234K1Z5",
+          // Seller identity starts empty; it must be entered in Tax Settings before invoicing.
           pricingMode: "EXCLUSIVE",
         },
         include: {
@@ -67,8 +66,7 @@ export async function PATCH(req: NextRequest) {
     if (!settings) {
       settings = await prisma.taxSettings.create({
         data: {
-          sellerStateCode: "27",
-          sellerGstin: "27AABCV1234K1Z5",
+          // Seller identity starts empty; it must be entered in Tax Settings before invoicing.
           pricingMode: "EXCLUSIVE",
         },
       });
@@ -94,12 +92,7 @@ export async function PATCH(req: NextRequest) {
 
     const updated = await prisma.taxSettings.update({
       where: { id: settings.id },
-      data: {
-        sellerStateCode: data.sellerStateCode,
-        sellerGstin: data.sellerGstin,
-        pricingMode: data.pricingMode,
-        defaultHsnId: data.defaultHsnId || null,
-      },
+      data: taxSettingsUpdateData(data),
       include: {
         defaultHsn: {
           select: { id: true, code: true, description: true, rateType: true },

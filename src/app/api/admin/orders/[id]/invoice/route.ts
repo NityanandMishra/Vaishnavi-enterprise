@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { generateOrderInvoice } from "@/lib/orders/invoice-generator";
 import { prisma } from "@/lib/db";
 
@@ -12,9 +13,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const orderId = params.id;
-    const body = await req.json().catch(() => ({}));
-    const actor = body.actor || "Staff";
+    const actor = auth.user.name;
 
     const result = await generateOrderInvoice(orderId, actor);
     return NextResponse.json(result);
@@ -32,6 +34,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const orderId = params.id;
 
     const invoice = await prisma.invoice.findUnique({

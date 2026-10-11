@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, FINANCE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 import { recordCodRemittance } from "@/lib/payments/payment-service";
 import { parsePaise } from "@/lib/money";
 
@@ -10,10 +10,9 @@ import { parsePaise } from "@/lib/money";
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(FINANCE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const remittances = await prisma.codRemittance.findMany({
       include: {
@@ -40,10 +39,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(FINANCE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
     const {

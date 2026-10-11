@@ -1,10 +1,13 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { ORDER_READ_ROLES, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export async function getOrders() {
   try {
+    await requireRole(ORDER_READ_ROLES);
     const orders = await prisma.order.findMany({
       include: {
         user: {
@@ -28,6 +31,7 @@ export async function getOrders() {
 
 export async function getOrderDetails(id: string) {
   try {
+    await requireRole(ORDER_READ_ROLES);
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -77,6 +81,12 @@ export async function getOrderDetails(id: string) {
 
 export async function updateOrderStatus(id: string, status: string) {
   try {
+    await requireRole(ORDER_WRITE_ROLES);
+    // This legacy action writes the status directly; SHIPPED must go through dispatch,
+    // whose shared transition issues the GST invoice (ORD-11).
+    if (status === "SHIPPED") {
+      return { success: false, error: "Orders move to SHIPPED only through dispatch, which issues the GST invoice." };
+    }
     const currentOrder = await prisma.order.findUnique({
       where: { id },
       include: { items: true },
@@ -133,6 +143,7 @@ export async function updateOrderShipping(
   }
 ) {
   try {
+    await requireRole(ORDER_WRITE_ROLES);
     const order = await prisma.order.update({
       where: { id },
       data: {

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { requireSellerStateCode } from "@/lib/tax/seller";
 import {
   OrderStatus,
   PaymentStatus,
@@ -14,7 +15,7 @@ import {
 import { resolveShippingRate } from "./shipping-resolver";
 import { getStateCodeByName } from "@/lib/tax/indian-states";
 import { calculateTax, roundPaisa } from "@/lib/tax/tax-engine";
-import { generateOrderInvoice } from "./invoice-generator";
+import { assertOrderCanBeInvoiced, createOrderInvoice } from "./invoice-generator";
 import { fulfilStock, releaseStock, reserveStock } from "@/lib/inventory/inventory-service";
 
 export class OrderTransitionError extends Error {
@@ -69,7 +70,7 @@ export async function transitionOrderStatus(
 ) {
   const { toStatus, reason, note, actor = "System", isSystem = false } = input;
 
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { items: true },
@@ -178,13 +179,24 @@ export async function transitionOrderStatus(
       },
     });
 
+    // Every move to SHIPPED issues the GST invoice in the same transaction (ORD-11), so no
+    // dispatch path can ship without one; if invoicing fails the order stays unshipped.
+    const invoice =
+      toStatus === "SHIPPED" ? (await createOrderInvoice(tx, orderId, actor)).invoice : null;
+
     return {
       success: true,
       order: updatedOrder,
       fromStatus: currentStatus,
       toStatus,
+      invoice,
     };
   });
+
+  // Email hook (not built yet; Brevo is a pre-deployment item): when result.invoice was just
+  // created, email the customer their invoice and dispatch confirmation here, after commit.
+
+  return result;
 }
 
 /**
@@ -467,7 +479,7 @@ export async function updateOrderShippingAddress(
     }
 
     const taxSettings = await tx.taxSettings.findFirst();
-    const sellerStateCode = taxSettings?.sellerStateCode || "27"; // Maharashtra
+    const sellerStateCode = requireSellerStateCode(taxSettings);
 
     let oldAddress: any = {};
     try {
@@ -476,8 +488,11 @@ export async function updateOrderShippingAddress(
       oldAddress = {};
     }
 
-    const oldStateCode = order.deliveryStateCode || getStateCodeByName(oldAddress.state || "") || "27";
-    const newStateCode = getStateCodeByName(newAddress.state) || "27";
+    const oldStateCode = order.deliveryStateCode || getStateCodeByName(oldAddress.state || "", "");
+    const newStateCode = getStateCodeByName(newAddress.state, "");
+    if (!newStateCode) {
+      throw new Error(`Unrecognised delivery state "${newAddress.state ?? ""}"; cannot determine GST type`);
+    }
 
     const oldPincode = (oldAddress.pincode || "").trim();
     const newPincode = newAddress.pincode.trim();
@@ -634,6 +649,9 @@ export async function dispatchOrderShipment(
 
   if (!order) throw new Error(`Order #${orderId} not found`);
 
+  // Fail before consuming stock if the SHIPPED transition would be unable to invoice
+  await assertOrderCanBeInvoiced(orderId);
+
   // Active items to fulfil
   const fulfilmentLines = shipmentData.items ||
     order.items
@@ -652,8 +670,8 @@ export async function dispatchOrderShipment(
     });
   }
 
-  // 2. Transition status to SHIPPED (system-only transition)
-  await transitionOrderStatus(orderId, {
+  // 2. Transition status to SHIPPED (system-only transition; issues the GST invoice, ORD-11)
+  const transition = await transitionOrderStatus(orderId, {
     toStatus: "SHIPPED",
     reason: `Dispatched via ${carrier} (AWB: ${awb})`,
     actor,
@@ -669,8 +687,7 @@ export async function dispatchOrderShipment(
     },
   });
 
-  // 4. Generate GST tax invoice (ORD-11)
-  const invoiceResult = await generateOrderInvoice(orderId, actor);
+  if (!transition.invoice) throw new Error(`Order #${orderId} shipped without an invoice`);
 
   return {
     success: true,
@@ -678,7 +695,7 @@ export async function dispatchOrderShipment(
     status: "SHIPPED",
     awb,
     trackingUrl,
-    invoice: invoiceResult.invoice,
+    invoice: transition.invoice,
   };
 }
 
@@ -755,8 +772,11 @@ export async function createManualOrder(input: CreateManualOrderInput) {
     },
   });
 
-  const sellerStateCode = taxSettings?.sellerStateCode || "27";
-  const deliveryStateCode = getStateCodeByName(shippingAddress.state) || "27";
+  const sellerStateCode = requireSellerStateCode(taxSettings);
+  const deliveryStateCode = getStateCodeByName(shippingAddress.state, "");
+  if (!deliveryStateCode) {
+    throw new Error(`Unrecognised delivery state "${shippingAddress.state ?? ""}"; cannot determine GST type`);
+  }
   const pricingMode = (taxSettings?.pricingMode as "EXCLUSIVE" | "INCLUSIVE") || "EXCLUSIVE";
 
   // Check live available stock for each variant (ORD-12 FR-16)

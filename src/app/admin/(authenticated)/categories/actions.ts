@@ -1,10 +1,13 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { CATALOG_WRITE_ROLES, STAFF_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export async function getCategories() {
   try {
+    await requireRole(STAFF_ROLES);
     const categories = await prisma.category.findMany({
       include: {
         image: true,
@@ -41,6 +44,7 @@ export async function getCategories() {
 
 export async function getCategoryImages() {
   try {
+    await requireRole(STAFF_ROLES);
     const images = await prisma.mediaImage.findMany({
       orderBy: {
         createdAt: "desc",
@@ -63,6 +67,7 @@ export async function createCategory(data: {
   parentId?: string | null;
 }) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     if (!data.name.trim()) {
       throw new Error("Category name is required");
     }
@@ -137,6 +142,7 @@ export async function updateCategory(
   }
 ) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     if (!data.name.trim()) {
       throw new Error("Category name is required");
     }
@@ -202,6 +208,7 @@ export async function updateCategory(
 
 export async function deleteCategory(id: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const category = await prisma.category.findUnique({
       where: { id },
       include: {

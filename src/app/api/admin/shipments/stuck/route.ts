@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { getStuckShipmentsQueue } from "@/lib/shipping/shipping-service";
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const queue = await getStuckShipmentsQueue();
     return NextResponse.json(queue);

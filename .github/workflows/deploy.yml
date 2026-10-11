@@ -30,6 +30,13 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      # Storefront pages query the database while prerendering, so the build needs the
+      # schema. This creates an empty SQLite DB from the migrations (and checks they apply).
+      - name: Create CI Database Schema
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Run Lint
         run: npm run lint
 

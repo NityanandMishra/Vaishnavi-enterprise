@@ -26,9 +26,11 @@ This is a unified, serverless monolithic application designed for **Rs 0 hosting
 
 2. **Database Sync & Seeding**:
    ```bash
-   npx prisma db push --force-reset
+   npx prisma migrate dev
    node prisma/seed.js
    ```
+   Change the schema only through migrations (`npx prisma migrate dev --name <change>`).
+   Do not use `prisma db push`: it skips the migration history that deployments rely on.
 
 3. **Start Development Server**:
    ```bash

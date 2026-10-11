@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { formatPaise } from "@/lib/money";
 
@@ -7,6 +8,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format") || "thermal"; // "thermal" (4x6) or "a4"

@@ -40,7 +40,9 @@ export default async function HsnListPage() {
   ).length;
 
   const now = new Date();
-  const sellerStateName = getStateNameByCode(settings?.sellerStateCode || "27");
+  const sellerStateName = settings?.sellerStateCode
+    ? getStateNameByCode(settings.sellerStateCode)
+    : "your registered state (not set in Tax Settings)";
 
   const formatted: HsnItem[] = hsnList.map((hsn) => {
     const activeVersion =

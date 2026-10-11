@@ -793,8 +793,18 @@ model CategoryHsnMapping {
 
 model TaxSettings {
   id              String   @id @default(uuid())
-  sellerStateCode String   @default("27") // e.g. "27" Maharashtra
-  sellerGstin     String   @default("27AABCV1234K1Z5")
+  // Seller identity printed on every GST invoice. No defaults: invoice generation
+  // refuses to run until these are filled in Admin → Tax Settings.
+  sellerLegalName    String? // e.g. "Vaishnavi Enterprises"
+  sellerTradeName    String?
+  sellerGstin        String? // 15 chars; first two digits must equal sellerStateCode
+  sellerStateCode    String? // GST state code, e.g. "09" Uttar Pradesh
+  sellerAddressLine1 String?
+  sellerAddressLine2 String?
+  sellerCity         String?
+  sellerPincode      String?
+  sellerPhone        String?
+  sellerEmail        String?
   pricingMode     String   @default("EXCLUSIVE") // "EXCLUSIVE" | "INCLUSIVE"
   defaultHsnId    String?
   updatedAt       DateTime @updatedAt

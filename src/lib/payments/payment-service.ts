@@ -242,7 +242,11 @@ export async function processWebhook(params: {
     (headers["signature"] as string) ||
     "";
 
-  const secret = params.secret || process.env.RAZORPAY_WEBHOOK_SECRET || "ve_test_secret_key";
+  // No fallback secret: with none configured, verifyWebhookSignature() rejects every event.
+  const secret = params.secret || process.env.RAZORPAY_WEBHOOK_SECRET || "";
+  if (!secret && !params.isPreVerified) {
+    console.error("RAZORPAY_WEBHOOK_SECRET is not set; all payment webhooks will be rejected");
+  }
 
   // Parse raw body safely
   let payload: any = {};
@@ -574,7 +578,7 @@ export async function replayWebhook(logId: string) {
     rawBody: log.rawBody,
     headers: parsedHeaders,
     signatureHeader: signature,
-    secret: process.env.RAZORPAY_WEBHOOK_SECRET || "ve_test_secret_key",
+    secret: process.env.RAZORPAY_WEBHOOK_SECRET,
     isPreVerified: log.signatureValid,
   });
 }

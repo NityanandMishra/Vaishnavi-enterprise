@@ -134,7 +134,7 @@ export default function FailedPaymentsQueuePage() {
                     Gateway Error Reason (Verbatim):
                   </div>
                   <div className="text-red-800 font-mono">
-                    "{item.failureReason}"{" "}
+                    &quot;{item.failureReason}&quot;{" "}
                     {item.failureCode && (
                       <span className="text-[11px] text-red-600">
                         [{item.failureCode}]

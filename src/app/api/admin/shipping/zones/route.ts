@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ADMIN_ONLY, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 import { createShippingZone, initDefaultShippingData } from "@/lib/shipping/shipping-service";
 
 /**
@@ -11,10 +11,9 @@ import { createShippingZone, initDefaultShippingData } from "@/lib/shipping/ship
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     await initDefaultShippingData();
 
@@ -42,10 +41,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     if (user.role !== "SUPER_ADMIN" && user.role !== "ADMIN") {
       return NextResponse.json(

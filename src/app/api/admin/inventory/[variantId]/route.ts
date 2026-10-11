@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/nextauth";
+import { guardApiRole, CATALOG_WRITE_ROLES, STAFF_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { getOrCreateInventory, deriveStockStatus } from "@/lib/inventory/inventory-service";
 
@@ -8,8 +7,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ variantId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await guardApiRole(STAFF_ROLES);
+  if (auth.response) return auth.response;
 
   const { variantId } = await params;
 
@@ -73,11 +72,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ variantId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "CATALOG_MANAGER")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guardApiRole(CATALOG_WRITE_ROLES);
+  if (auth.response) return auth.response;
 
   const { variantId } = await params;
   const body = await request.json();

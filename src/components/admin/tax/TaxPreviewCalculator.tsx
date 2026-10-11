@@ -67,13 +67,13 @@ export default function TaxPreviewCalculator({
     const apparelHsn = hsns.find((h) => h.code === "6109") || hsns[0];
     return apparelHsn ? apparelHsn.id : "";
   });
-  const [deliveryStateCode, setDeliveryStateCode] = useState<string>(sellerStateCode || "27");
+  const [deliveryStateCode, setDeliveryStateCode] = useState<string>(sellerStateCode || "");
 
   // Optional: Category picker mode
   const [testByMode, setTestByMode] = useState<"HSN" | "CATEGORY">("HSN");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
-  const sellerStateName = getStateNameByCode(sellerStateCode);
+  const sellerStateName = sellerStateCode ? getStateNameByCode(sellerStateCode) : "Not set in Tax Settings";
   const deliveryStateName = getStateNameByCode(deliveryStateCode);
 
   const hsnOptions: SelectOption[] = useMemo(
@@ -151,7 +151,7 @@ export default function TaxPreviewCalculator({
     setDiscount(100);
     const apparel = hsns.find((h) => h.code === "6109") || hsns[0];
     if (apparel) setSelectedHsnId(apparel.id);
-    setDeliveryStateCode(sellerStateCode || "27");
+    setDeliveryStateCode(sellerStateCode || "");
     setTestByMode("HSN");
     setSelectedCategoryId("");
   }

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, TAX_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { calculateTax } from "@/lib/tax/tax-engine";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await guardApiRole(TAX_READ_ROLES);
+    if (auth.response) return auth.response;
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("productId");
     const priceStr = searchParams.get("price");
@@ -122,7 +125,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const sellerStateCode = settings?.sellerStateCode || "27";
+    if (!settings?.sellerStateCode) {
+      return NextResponse.json(
+        { ok: false, error: "Seller state is not set in Tax Settings", code: "SELLER_NOT_CONFIGURED" },
+        { status: 422 }
+      );
+    }
+    const sellerStateCode = settings.sellerStateCode;
     const pricingMode = settings?.pricingMode || "EXCLUSIVE";
 
     const taxResult = calculateTax({

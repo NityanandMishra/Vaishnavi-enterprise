@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ADMIN_ONLY } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const { id } = await params;
     const courier = await prisma.courier.findUnique({

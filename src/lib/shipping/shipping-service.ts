@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import { formatPaise, rupeesToPaise, paiseToRupees } from "@/lib/money";
 import { fulfilStock, restoreRtoStock } from "@/lib/inventory/inventory-service";
 import { trackCodCollection } from "@/lib/payments/payment-service";
+import { transitionOrderStatus } from "@/lib/orders/order-service";
+import { assertOrderCanBeInvoiced } from "@/lib/orders/invoice-generator";
 import crypto from "crypto";
 import {
   ZoneMatchType,
@@ -1077,6 +1079,12 @@ export async function dispatchShipment(data: {
 
   const labelUrl = `/api/admin/shipments/${shipment.id}/label`;
 
+  // The first dispatch moves the order to SHIPPED, which issues the GST invoice.
+  // Fail here, before consuming stock, if that invoice could not be issued.
+  if (shipment.order.status !== "SHIPPED") {
+    await assertOrderCanBeInvoiced(shipment.orderId);
+  }
+
   // 1. Consume stock for the shipped lines only (INV-04, FR-19)
   const linesToFulfil = shipment.lines
     .filter((l) => l.orderLine.variantId)
@@ -1115,25 +1123,19 @@ export async function dispatchShipment(data: {
     include: { events: true, courier: true, lines: true },
   });
 
-  // 3. Move Order to SHIPPED if not already shipped (SHIP-08)
+  // 3. Move Order to SHIPPED if not already shipped (SHIP-08). Uses the shared
+  // transition so the state machine applies and the GST invoice is issued (ORD-11).
   if (shipment.order.status !== "SHIPPED") {
-    await prisma.order.update({
-      where: { id: shipment.orderId },
-      data: {
-        status: "SHIPPED",
-        shippedAt: new Date(),
-        trackingNumber: finalAwb,
-      },
+    await transitionOrderStatus(shipment.orderId, {
+      toStatus: "SHIPPED",
+      reason: `Dispatched in shipment ${shipment.shipmentNumber} (AWB: ${finalAwb})`,
+      actor: data.userName || "Ops Team",
+      isSystem: true,
     });
 
-    await prisma.orderStatusHistory.create({
-      data: {
-        orderId: shipment.orderId,
-        fromStatus: shipment.order.status,
-        toStatus: "SHIPPED",
-        reason: `Dispatched in shipment ${shipment.shipmentNumber} (AWB: ${finalAwb})`,
-        createdBy: data.userName || "Ops Team",
-      },
+    await prisma.order.update({
+      where: { id: shipment.orderId },
+      data: { trackingNumber: finalAwb },
     });
   }
 

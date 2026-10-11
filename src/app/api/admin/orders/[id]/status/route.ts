@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { transitionOrderStatus, OrderTransitionError } from "@/lib/orders/order-service";
 
 /**
@@ -13,9 +14,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
     const orderId = params.id;
     const body = await req.json();
-    const { toStatus, reason, note, actor = "Staff" } = body;
+    const { toStatus, reason, note } = body;
+    const actor = auth.user.name; // audit actor comes from the session, never the request body
 
     if (!toStatus) {
       return NextResponse.json(

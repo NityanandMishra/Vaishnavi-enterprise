@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/nextauth";
 import { prisma } from "@/lib/db";
 import TaxSettingsForm from "@/components/admin/tax/TaxSettingsForm";
+import { sellerIdentityProblems } from "@/lib/tax/seller";
 
 export const metadata: Metadata = {
   title: "Tax Settings — Admin Portal",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function TaxSettingsPage() {
   const session = await getServerSession(authOptions);
-  const role = ((session?.user as any)?.role || "ADMIN") as string;
+  const role = ((session?.user as any)?.role || "") as string;
 
   // TAX-05: Other roles cannot reach the screen at all (CATALOG_MANAGER, OPS_EXECUTIVE)
   if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "FINANCE") {
@@ -38,8 +39,7 @@ export default async function TaxSettingsPage() {
   if (!settings) {
     settings = await prisma.taxSettings.create({
       data: {
-        sellerStateCode: "27",
-        sellerGstin: "27AABCV1234K1Z5",
+        // Seller identity starts empty; it must be entered in Tax Settings before invoicing.
         pricingMode: "EXCLUSIVE",
       },
       include: {
@@ -56,6 +56,15 @@ export default async function TaxSettingsPage() {
     id: settings.id,
     sellerStateCode: settings.sellerStateCode,
     sellerGstin: settings.sellerGstin,
+    sellerLegalName: settings.sellerLegalName,
+    sellerTradeName: settings.sellerTradeName,
+    sellerAddressLine1: settings.sellerAddressLine1,
+    sellerAddressLine2: settings.sellerAddressLine2,
+    sellerCity: settings.sellerCity,
+    sellerPincode: settings.sellerPincode,
+    sellerPhone: settings.sellerPhone,
+    sellerEmail: settings.sellerEmail,
+    invoicingProblems: sellerIdentityProblems(settings),
     pricingMode: settings.pricingMode,
     defaultHsnId: settings.defaultHsnId,
     defaultHsn: settings.defaultHsn,

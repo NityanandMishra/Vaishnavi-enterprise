@@ -1,5 +1,7 @@
 "use server";
 
+import { requireRole } from "@/lib/tax/auth-helper";
+import { CATALOG_WRITE_ROLES, STAFF_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
@@ -7,6 +9,7 @@ import { revalidatePath } from "next/cache";
 
 export async function getImages() {
   try {
+    await requireRole(STAFF_ROLES);
     const images = await prisma.mediaImage.findMany({
       include: {
         _count: {
@@ -37,6 +40,7 @@ export async function getImages() {
 
 export async function uploadImage(formData: FormData) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const file = formData.get("file") as File | null;
     if (!file) {
       throw new Error("No file provided");
@@ -82,6 +86,7 @@ export async function uploadImage(formData: FormData) {
 
 export async function deleteImage(id: string) {
   try {
+    await requireRole(CATALOG_WRITE_ROLES);
     const image = await prisma.mediaImage.findUnique({
       where: { id },
       include: {

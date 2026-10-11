@@ -80,7 +80,7 @@ const STANDARD_RATES = [0, 0.25, 3, 5, 12, 18, 28];
 export default function HsnManager({
   initialHsns,
   unmappedCount = 0,
-  sellerStateName = "Maharashtra",
+  sellerStateName = "your registered state",
 }: {
   initialHsns: HsnItem[];
   unmappedCount?: number;

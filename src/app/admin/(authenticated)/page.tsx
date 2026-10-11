@@ -181,7 +181,7 @@ export default async function AdminDashboard() {
         <div className="bg-white rounded-[8px] border border-[#E2E8F0] shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)] p-[22px] flex items-start justify-between">
           <div>
             <p className="m-0 mb-1 text-[12px] font-bold tracking-[0.05em] text-[#94A3B8] uppercase">
-              Today's Revenue
+              Today&apos;s Revenue
             </p>
             <h4 className="m-0 text-[26px] font-bold text-[#0F172A] tracking-tight font-sans">
               {formatINR(revenue)}

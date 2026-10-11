@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { guardApiRole, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { dispatchShipment } from "@/lib/shipping/shipping-service";
 
 export async function POST(
@@ -7,10 +7,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
+    const user = auth.user;
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));

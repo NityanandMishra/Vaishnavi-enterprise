@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, FINANCE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { getAuthenticatedUser } from "@/lib/tax/auth-helper";
 import { parsePaise } from "@/lib/money";
@@ -9,6 +10,8 @@ import { parsePaise } from "@/lib/money";
  */
 export async function GET(req: NextRequest) {
   try {
+    const auth = await guardApiRole(FINANCE_ROLES);
+    if (auth.response) return auth.response;
     const user = await getAuthenticatedUser();
     // Allow SUPER_ADMIN, ADMIN, FINANCE, OPS_EXECUTIVE (read-only for OPS)
     if (!user) {

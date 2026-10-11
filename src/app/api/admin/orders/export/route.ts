@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_READ_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 
 /**
@@ -7,6 +8,8 @@ import { prisma } from "@/lib/db";
  */
 export async function GET(req: NextRequest) {
   try {
+    const auth = await guardApiRole(ORDER_READ_ROLES);
+    if (auth.response) return auth.response;
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format") || "order"; // "order" | "item"
     const status = searchParams.get("status");

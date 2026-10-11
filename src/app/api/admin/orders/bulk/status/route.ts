@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardApiRole, ORDER_WRITE_ROLES } from "@/lib/api-guard";
 import { prisma } from "@/lib/db";
 import { transitionOrderStatus, OrderTransitionError } from "@/lib/orders/order-service";
 
@@ -10,8 +11,11 @@ import { transitionOrderStatus, OrderTransitionError } from "@/lib/orders/order-
  */
 export async function POST(req: NextRequest) {
   try {
+    const auth = await guardApiRole(ORDER_WRITE_ROLES);
+    if (auth.response) return auth.response;
     const body = await req.json();
-    const { orderIds, toStatus, reason, note, actor = "Staff" } = body;
+    const { orderIds, toStatus, reason, note } = body;
+    const actor = auth.user.name; // audit actor comes from the session, never the request body
 
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(

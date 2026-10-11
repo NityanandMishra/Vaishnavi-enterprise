@@ -81,6 +81,15 @@ export default function ManualOrderCreationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Seller GST state comes from Tax Settings (null until configured)
+  const [sellerStateCode, setSellerStateCode] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/admin/seller-state")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setSellerStateCode(data?.sellerStateCode ?? null))
+      .catch(() => setSellerStateCode(null));
+  }, []);
+
   // Search products / variants
   useEffect(() => {
     if (!productSearch || productSearch.trim().length < 2) {
@@ -205,9 +214,8 @@ export default function ManualOrderCreationPage() {
   };
 
   // Live Calculations
-  const sellerStateCode = "27"; // Maharashtra
-  const deliveryStateCode = getStateCodeByName(state) || "27";
-  const isInterState = deliveryStateCode !== sellerStateCode;
+  const deliveryStateCode = getStateCodeByName(state, "");
+  const isInterState = !!sellerStateCode && deliveryStateCode !== sellerStateCode;
 
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const totalLineDiscounts = items.reduce((sum, item) => sum + item.lineDiscount, 0);

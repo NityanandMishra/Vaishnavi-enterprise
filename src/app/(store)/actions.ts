@@ -423,8 +423,13 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     },
   });
 
-  const sellerStateCode = taxSettings?.sellerStateCode || "27";
-  const deliveryStateCode = getStateCodeByName(parsed.data.state, sellerStateCode);
+  const sellerStateCode = taxSettings?.sellerStateCode;
+  if (!sellerStateCode) {
+    console.error("placeOrder: seller state is not set in Tax Settings; cannot compute GST");
+    return { ok: false as const, error: "Checkout is temporarily unavailable. Please contact us on WhatsApp." };
+  }
+  const deliveryStateCode = getStateCodeByName(parsed.data.state, "");
+  if (!deliveryStateCode) return { ok: false as const, error: "Please select a valid delivery state." };
   const pricingMode = (taxSettings?.pricingMode || "EXCLUSIVE") as "EXCLUSIVE" | "INCLUSIVE";
 
   const rawLines = cart.items.map((item) => ({
@@ -634,6 +639,23 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
       },
     },
   });
+
+  // Record the pending COD collection (Module 06 PAY / SEC-01). Online payments get
+  // their transaction only from a verified gateway webhook, never at order placement.
+  if (parsed.data.paymentMethod === "COD") {
+    await prisma.paymentTransaction.create({
+      data: {
+        orderId: order.id,
+        gateway: "COD",
+        method: "COD",
+        amountPaise: Math.round(finalTotal * 100),
+        status: "PENDING",
+        gatewayTransactionId: `cod_${orderId.slice(0, 12)}`,
+        gatewayResponseMessage: "Cash on delivery - pending collection upon handover",
+        initiatedAt: new Date(),
+      },
+    });
+  }
 
   // Write initial timeline entry (ORD-09)
   await prisma.orderStatusHistory.create({
@@ -847,3 +869,45 @@ export async function submitProductReview(_prev: unknown, formData: FormData) {
   return { ok: true as const, reviewId: review.id };
 }
 
+// ─── CUSTOMER ORDER ACTIONS (CANCELLATION & RETURNS) ──────────────────────────
+
+export async function customerCancelOrder(
+  orderId: string,
+  reason: string,
+  note?: string
+) {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false as const, error: "Please sign in to manage your order." };
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!order || order.userId !== userId) {
+    return { ok: false as const, error: "Order not found or unauthorized." };
+  }
+
+  // Once an order is SHIPPED or DELIVERED, customer cancellation is not permitted
+  if (["SHIPPED", "DELIVERED", "CANCELLED", "RETURNED"].includes(order.status)) {
+    return {
+      ok: false as const,
+      error: `This order cannot be cancelled as it is already ${order.status.toLowerCase().replace(/_/g, " ")}.`,
+    };
+  }
+
+  try {
+    const { cancelOrder } = await import("@/lib/orders/order-service");
+    await cancelOrder(orderId, {
+      reason: reason || "Customer requested cancellation",
+      note: note || undefined,
+      actor: "Customer",
+      notifyCustomer: true,
+    });
+
+    revalidatePath("/account");
+    revalidatePath(`/account/orders/${orderId}`);
+    return { ok: true as const };
+  } catch (err: any) {
+    return { ok: false as const, error: err.message || "Failed to cancel order." };
+  }
+}
