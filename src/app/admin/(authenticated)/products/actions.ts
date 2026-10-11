@@ -384,8 +384,8 @@ export async function saveProductDraft(data: any) {
             unit: d.unit || "Piece",
             hsnCode: d.hsnCode || null,
             gstRate: d.gstRate ? Number(d.gstRate) : null,
-            status: d.status || "DRAFT",
-            isAvailable: d.status === "ACTIVE",
+            // Status never changes here: going live must pass the publish gate
+            // (publishProduct); deactivate/archive/restore use updateProductStatus.
             metaTitle: d.metaTitle || null,
             metaDescription: d.metaDescription || null,
             specs: JSON.stringify(d.specs || {}),

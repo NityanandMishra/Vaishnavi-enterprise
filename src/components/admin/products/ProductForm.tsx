@@ -579,6 +579,29 @@ export default function ProductForm({
   };
 
   // ─── CREATE INLINE BRAND ─────────────────────────────────────────────────
+  // Status changes go through the server rules, never through a draft save:
+  // Active = publish gate; Inactive/Archived = updateProductStatus (archived restores to Inactive).
+  const handleStatusChange = async (next: typeof status) => {
+    if (next === status) return;
+    if (next === "ACTIVE") {
+      await handlePublish();
+      return;
+    }
+    if (next === "DRAFT") return; // a product that has left Draft does not go back to it
+    if (!id) {
+      toast.error("Save first", "Save the draft before changing its status.");
+      return;
+    }
+    const target = status === "ARCHIVED" && next === "INACTIVE" ? "RESTORE" : next;
+    const res = await updateProductStatus(id, target);
+    if (res.success) {
+      setStatus(next);
+      toast.success("Status updated", `${title} is now ${next === "INACTIVE" ? "inactive (off sale)" : "archived"}.`);
+    } else {
+      toast.error("Status not changed", (res as any).error || "Could not change status");
+    }
+  };
+
   const handleCreateBrand = () => {
     if (!newBrandName.trim()) return;
     const newBrand: Brand = {
@@ -631,10 +654,12 @@ export default function ProductForm({
           {/* Status Dropdown */}
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
+            onChange={(e) => handleStatusChange(e.target.value as typeof status)}
             className="h-9 px-3 text-[var(--text-xs)] font-medium bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] text-[var(--color-fg)] focus:ring-2 focus:ring-[var(--color-primary)]"
           >
-            <option value="DRAFT">Draft</option>
+            <option value="DRAFT" disabled={status !== "DRAFT"}>
+              Draft
+            </option>
             <option value="ACTIVE">Active (Live)</option>
             <option value="INACTIVE">Inactive (Off sale)</option>
             <option value="ARCHIVED">Archived (Retired)</option>
