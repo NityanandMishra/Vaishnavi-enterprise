@@ -87,7 +87,7 @@ export default async function TaxPreviewPage() {
     };
   });
 
-  const sellerStateCode = settings?.sellerStateCode || "27";
+  const sellerStateCode = settings?.sellerStateCode || "";
   const pricingMode = settings?.pricingMode || "EXCLUSIVE";
 
   return (

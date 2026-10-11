@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { requireSellerStateCode } from "@/lib/tax/seller";
 import {
   OrderStatus,
   PaymentStatus,
@@ -467,7 +468,7 @@ export async function updateOrderShippingAddress(
     }
 
     const taxSettings = await tx.taxSettings.findFirst();
-    const sellerStateCode = taxSettings?.sellerStateCode || "27"; // Maharashtra
+    const sellerStateCode = requireSellerStateCode(taxSettings);
 
     let oldAddress: any = {};
     try {
@@ -476,8 +477,11 @@ export async function updateOrderShippingAddress(
       oldAddress = {};
     }
 
-    const oldStateCode = order.deliveryStateCode || getStateCodeByName(oldAddress.state || "") || "27";
-    const newStateCode = getStateCodeByName(newAddress.state) || "27";
+    const oldStateCode = order.deliveryStateCode || getStateCodeByName(oldAddress.state || "", "");
+    const newStateCode = getStateCodeByName(newAddress.state, "");
+    if (!newStateCode) {
+      throw new Error(`Unrecognised delivery state "${newAddress.state ?? ""}"; cannot determine GST type`);
+    }
 
     const oldPincode = (oldAddress.pincode || "").trim();
     const newPincode = newAddress.pincode.trim();
@@ -755,8 +759,11 @@ export async function createManualOrder(input: CreateManualOrderInput) {
     },
   });
 
-  const sellerStateCode = taxSettings?.sellerStateCode || "27";
-  const deliveryStateCode = getStateCodeByName(shippingAddress.state) || "27";
+  const sellerStateCode = requireSellerStateCode(taxSettings);
+  const deliveryStateCode = getStateCodeByName(shippingAddress.state, "");
+  if (!deliveryStateCode) {
+    throw new Error(`Unrecognised delivery state "${shippingAddress.state ?? ""}"; cannot determine GST type`);
+  }
   const pricingMode = (taxSettings?.pricingMode as "EXCLUSIVE" | "INCLUSIVE") || "EXCLUSIVE";
 
   // Check live available stock for each variant (ORD-12 FR-16)

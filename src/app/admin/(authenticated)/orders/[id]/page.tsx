@@ -40,6 +40,14 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Seller GST state comes from Tax Settings (null until configured)
+  const [sellerStateCode, setSellerStateCode] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/admin/seller-state")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setSellerStateCode(data?.sellerStateCode ?? null))
+      .catch(() => setSellerStateCode(null));
+  }, []);
   const [error, setError] = useState<string | null>(null);
 
   // Modals & Drawers
@@ -270,7 +278,7 @@ export default function OrderDetailPage() {
   const shipping = order.parsedShipping || {};
   const isPreDispatch = ["PENDING", "CONFIRMED", "PROCESSING", "PACKED"].includes(order.status);
   const isShippedOrDelivered = order.status === "SHIPPED" || order.status === "DELIVERED";
-  const isInterState = order.deliveryStateCode !== "27"; // House seller state: 27 Maharashtra
+  const isInterState = !!sellerStateCode && order.deliveryStateCode !== sellerStateCode;
 
   // Formatted courier-ready address text for copy (ORD-07 AC 8)
   const courierFormattedAddress = `${shipping.fullName || order.customerName}\n${shipping.addressLine1}${
@@ -1007,7 +1015,7 @@ export default function OrderDetailPage() {
         orderId={order.id}
         orderNumber={order.orderNumber}
         currentAddress={shipping}
-        sellerStateCode="27"
+        sellerStateCode={sellerStateCode || ""}
         currentShippingCost={order.shippingCost || 0}
         currentTotal={order.totalAmount || 0}
         taxAmount={order.taxAmount || 0}

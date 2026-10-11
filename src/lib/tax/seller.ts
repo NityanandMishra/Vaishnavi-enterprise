@@ -81,11 +81,17 @@ export function sellerIdentityProblems(settings: SellerSettings | null): string[
   return problems;
 }
 
-/** Seller's GST state code, needed for every tax split. Throws if not configured. */
-export async function getSellerStateCode(db: Db = prisma): Promise<string> {
-  const settings = await db.taxSettings.findFirst({ select: { sellerStateCode: true } });
+/** Seller's GST state code from already-loaded settings. Throws if not configured. */
+export function requireSellerStateCode(settings: { sellerStateCode: string | null } | null): string {
   if (!settings?.sellerStateCode) throw new SellerNotConfiguredError(["missing state"]);
   return settings.sellerStateCode;
+}
+
+/** Seller's GST state code, needed for every tax split. Throws if not configured. */
+export async function getSellerStateCode(db: Db = prisma): Promise<string> {
+  return requireSellerStateCode(
+    await db.taxSettings.findFirst({ select: { sellerStateCode: true } })
+  );
 }
 
 /** Full seller identity for an invoice. Throws SellerNotConfiguredError listing every problem. */

@@ -423,8 +423,13 @@ export async function placeOrder(_prev: unknown, formData: FormData) {
     },
   });
 
-  const sellerStateCode = taxSettings?.sellerStateCode || "27";
-  const deliveryStateCode = getStateCodeByName(parsed.data.state, sellerStateCode);
+  const sellerStateCode = taxSettings?.sellerStateCode;
+  if (!sellerStateCode) {
+    console.error("placeOrder: seller state is not set in Tax Settings; cannot compute GST");
+    return { ok: false as const, error: "Checkout is temporarily unavailable. Please contact us on WhatsApp." };
+  }
+  const deliveryStateCode = getStateCodeByName(parsed.data.state, "");
+  if (!deliveryStateCode) return { ok: false as const, error: "Please select a valid delivery state." };
   const pricingMode = (taxSettings?.pricingMode || "EXCLUSIVE") as "EXCLUSIVE" | "INCLUSIVE";
 
   const rawLines = cart.items.map((item) => ({

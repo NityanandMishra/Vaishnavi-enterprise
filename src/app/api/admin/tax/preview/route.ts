@@ -36,7 +36,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "HSN code not found" }, { status: 404 });
     }
 
-    const sellerStateCode = settings?.sellerStateCode || "27";
+    if (!settings?.sellerStateCode) {
+      return NextResponse.json(
+        { ok: false, error: "Seller state is not set in Tax Settings", code: "SELLER_NOT_CONFIGURED" },
+        { status: 422 }
+      );
+    }
+    const sellerStateCode = settings.sellerStateCode;
     const pricingMode = settings?.pricingMode || "EXCLUSIVE";
 
     const result = calculateTax({

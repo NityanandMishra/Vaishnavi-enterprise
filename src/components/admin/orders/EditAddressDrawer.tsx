@@ -19,7 +19,7 @@ interface EditAddressDrawerProps {
     city?: string;
     state?: string;
   };
-  sellerStateCode?: string;
+  sellerStateCode: string; // from Tax Settings; empty when not configured
   currentShippingCost?: number;
   currentTotal?: number;
   taxAmount?: number;
@@ -32,7 +32,7 @@ export default function EditAddressDrawer({
   orderId,
   orderNumber,
   currentAddress,
-  sellerStateCode = "27",
+  sellerStateCode,
   currentShippingCost = 0,
   currentTotal = 0,
   taxAmount = 0,
@@ -88,8 +88,8 @@ export default function EditAddressDrawer({
   if (!isOpen) return null;
 
   // Calculate if changes trigger FI-04a consequences
-  const oldStateCode = getStateCodeByName(currentAddress.state || "") || "27";
-  const newStateCode = getStateCodeByName(state) || "27";
+  const oldStateCode = getStateCodeByName(currentAddress.state || "", "");
+  const newStateCode = getStateCodeByName(state, "");
   const stateChanged = oldStateCode !== newStateCode;
 
   const oldIsInter = oldStateCode !== sellerStateCode;

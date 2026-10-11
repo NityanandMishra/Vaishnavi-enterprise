@@ -690,7 +690,10 @@ export async function previewTaxAction(raw: TaxPreviewInput) {
     return { ok: false, error: "HSN code not found" };
   }
 
-  const sellerStateCode = settings?.sellerStateCode || "27";
+  if (!settings?.sellerStateCode) {
+    return { ok: false, error: "Set the registered origin state in Tax Settings first." };
+  }
+  const sellerStateCode = settings.sellerStateCode;
   const pricingMode = settings?.pricingMode || "EXCLUSIVE";
 
   const result = calculateTax({
