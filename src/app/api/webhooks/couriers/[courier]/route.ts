@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { ingestTrackingEvent } from "@/lib/shipping/shipping-service";
 import crypto from "crypto";
+import { safeEqual } from "@/lib/api-guard";
 
 export async function POST(
   req: NextRequest,
@@ -25,24 +26,27 @@ export async function POST(
     const rawBody = await req.text();
     const signature = req.headers.get("x-courier-signature") || req.headers.get("x-webhook-signature");
 
-    // Signature verification (SHIP-07: Invalid signatures are rejected with 401)
-    const webhookSecret = process.env[`${courier.code}_WEBHOOK_SECRET`] || process.env.COURIER_WEBHOOK_SECRET || "default-secret";
+    // Signature verification (SHIP-07: Invalid signatures are rejected with 401).
+    // Fails closed: no configured secret or no signature means the event is rejected.
+    const webhookSecret = process.env[`${courier.code}_WEBHOOK_SECRET`] || process.env.COURIER_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error(`Webhook secret not configured for courier ${courier.code}; rejecting event`);
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    }
 
-    if (signature) {
-      const expectedSignature = crypto
-        .createHmac("sha256", webhookSecret)
-        .update(rawBody)
-        .digest("hex");
+    if (!signature) {
+      console.warn(`SECURITY: Missing webhook signature for courier ${courier.code}`);
+      return NextResponse.json({ error: "Missing webhook signature" }, { status: 401 });
+    }
 
-      const isValid =
-        signature === expectedSignature ||
-        signature === "test-valid-sig" ||
-        crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature)).valueOf();
+    const expectedSignature = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(rawBody)
+      .digest("hex");
 
-      if (!isValid) {
-        console.warn(`SECURITY: Invalid webhook signature for courier ${courier.code}`);
-        return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
-      }
+    if (!safeEqual(signature, expectedSignature)) {
+      console.warn(`SECURITY: Invalid webhook signature for courier ${courier.code}`);
+      return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
     }
 
     const payload = JSON.parse(rawBody);
