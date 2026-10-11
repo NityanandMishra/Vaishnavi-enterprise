@@ -3,7 +3,35 @@ const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
+// Local dev = SQLite file database and not NODE_ENV=production. Anywhere else
+// (staging/production Postgres) the seed passwords must be supplied explicitly.
+function resolveSeedPasswords() {
+  const isLocalDev =
+    process.env.NODE_ENV !== "production" &&
+    (process.env.DATABASE_URL || "").startsWith("file:");
+
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  const customerPassword = process.env.SEED_CUSTOMER_PASSWORD;
+
+  if (!isLocalDev && (!adminPassword || !customerPassword)) {
+    throw new Error(
+      "SEED_ADMIN_PASSWORD and SEED_CUSTOMER_PASSWORD must be set when seeding outside local dev. Aborting before any data is changed."
+    );
+  }
+  if (!adminPassword || !customerPassword) {
+    console.warn("WARNING: using default local-dev seed passwords. Never use these outside local dev.");
+  }
+
+  return {
+    adminPassword: adminPassword || "admin123",
+    customerPassword: customerPassword || "customer123",
+  };
+}
+
 async function main() {
+  // Checked before the wipe below, so a misconfigured run changes nothing.
+  const { adminPassword, customerPassword } = resolveSeedPasswords();
+
   console.log("Starting database seeding...");
 
   // 1. Clean existing records (in reverse dependency order)
@@ -36,12 +64,6 @@ async function main() {
   await prisma.user.deleteMany();
 
   console.log("Database cleaned.");
-
-  // ─── WARNING: DO NOT USE THESE IN PRODUCTION/STAGING ────────────────────────
-  // Default development credentials. In production/staging environments, set the
-  // SEED_ADMIN_PASSWORD and SEED_CUSTOMER_PASSWORD environment variables.
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || "admin123";
-  const customerPassword = process.env.SEED_CUSTOMER_PASSWORD || "customer123";
 
   // 2. Seed Admin User
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
