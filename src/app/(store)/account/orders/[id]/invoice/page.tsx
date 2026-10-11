@@ -23,6 +23,7 @@ export default async function CustomerOrderInvoicePage({
       where: { id: params.id },
       include: {
         user: true,
+        invoice: true,
         items: {
           include: {
             product: {
@@ -56,7 +57,9 @@ export default async function CustomerOrderInvoicePage({
   const gstAmount = totalSnapshotTax > 0 ? totalSnapshotTax : Math.round(subtotal * 0.18);
 
   const invoiceData: InvoiceData = {
-    invoiceNumber: `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
+    invoiceNumber:
+      order.invoice?.invoiceNumber ||
+      `INV-${new Date(order.createdAt).getFullYear()}-${order.id.slice(0, 8).toUpperCase()}`,
     orderId: order.id,
     orderDate: order.createdAt,
     paymentMethod: order.paymentMethod === "COD" ? "Cash on Delivery" : "Online / UPI (Razorpay)",
